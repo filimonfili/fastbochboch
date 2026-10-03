@@ -94,6 +94,7 @@ bot.setMyCommands([
     command: "admin",
     description: "Open admin panel",
   },
+  { command: "checkadmin", description: "Check admin access" },
 ]);
 
 // ============================================================
@@ -243,27 +244,31 @@ Ready to play?`,
   );
 };
 bot.onText(/^\/checkadmin$/, async (msg) => {
-  const telegramId = msg.from?.id;
+  try {
+    const telegramId = msg.from?.id;
+    const configuredAdminId = String(adminTelegramId).trim();
 
-  await bot.sendMessage(
-    msg.chat.id,
-    `🔍 Admin Debug
+    console.log("🔍 ADMIN DEBUG");
+    console.log("Telegram ID:", telegramId);
+    console.log("Configured Admin ID:", configuredAdminId);
+    console.log("Is Admin:", String(telegramId) === configuredAdminId);
+
+    await bot.sendMessage(
+      msg.chat.id,
+      `🔍 Admin Debug
 
 Your Telegram ID:
 ${telegramId}
 
 Configured Admin ID:
-${adminTelegramId}
+${configuredAdminId}
 
 Is Admin:
-${isAdmin(telegramId) ? "YES ✅" : "NO ❌"}`,
-  );
-
-  console.log("🔍 ADMIN DEBUG:", {
-    telegramId,
-    configuredAdminId: adminTelegramId,
-    isAdmin: isAdmin(telegramId),
-  });
+${String(telegramId) === configuredAdminId ? "YES ✅" : "NO ❌"}`,
+    );
+  } catch (error) {
+    console.error("❌ /checkadmin error:", error);
+  }
 });
 
 // ============================================================
