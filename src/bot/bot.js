@@ -242,6 +242,29 @@ Ready to play?`,
     },
   );
 };
+bot.onText(/^\/checkadmin$/, async (msg) => {
+  const telegramId = msg.from?.id;
+
+  await bot.sendMessage(
+    msg.chat.id,
+    `🔍 Admin Debug
+
+Your Telegram ID:
+${telegramId}
+
+Configured Admin ID:
+${adminTelegramId}
+
+Is Admin:
+${isAdmin(telegramId) ? "YES ✅" : "NO ❌"}`,
+  );
+
+  console.log("🔍 ADMIN DEBUG:", {
+    telegramId,
+    configuredAdminId: adminTelegramId,
+    isAdmin: isAdmin(telegramId),
+  });
+});
 
 // ============================================================
 // /MYID
