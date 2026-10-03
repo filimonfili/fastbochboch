@@ -58,59 +58,88 @@ const bot = new TelegramBot(token, {
 
 console.log("🤖 Telegram bot started");
 
-console.log("🔐 Admin configuration loaded:", {
-  configured: Boolean(adminTelegramId),
-});
-
 // ============================================================
 // TELEGRAM COMMANDS
 // ============================================================
 
-bot
-  .setMyCommands([
-    {
-      command: "start",
-      description: "Start Fast Boch Boch",
-    },
-    {
-      command: "playnow",
-      description: "Play Boch Boch",
-    },
-    {
-      command: "balance",
-      description: "Check wallet balance",
-    },
-    {
-      command: "deposit",
-      description: "Deposit money",
-    },
-    {
-      command: "withdraw",
-      description: "Withdraw money",
-    },
-    {
-      command: "support",
-      description: "Get support",
-    },
-    {
-      command: "admin",
-      description: "Open admin panel",
-    },
-    {
-      command: "myid",
-      description: "Show Telegram ID",
-    },
-    {
-      command: "checkadmin",
-      description: "Check admin access",
-    },
-  ])
-  .then(() => {
-    console.log("✅ Telegram commands registered successfully");
-  })
-  .catch((error) => {
-    console.error("❌ Failed to register Telegram commands:", error);
-  });
+const telegramCommands = [
+  {
+    command: "start",
+    description: "Start Fast Boch Boch",
+  },
+  {
+    command: "playnow",
+    description: "Play Boch Boch",
+  },
+  {
+    command: "balance",
+    description: "Check wallet balance",
+  },
+  {
+    command: "deposit",
+    description: "Deposit money",
+  },
+  {
+    command: "withdraw",
+    description: "Withdraw money",
+  },
+  {
+    command: "support",
+    description: "Get support",
+  },
+  {
+    command: "admin",
+    description: "Open admin panel",
+  },
+  {
+    command: "myid",
+    description: "Show Telegram ID",
+  },
+  {
+    command: "checkadmin",
+    description: "Check admin access",
+  },
+];
+
+// ============================================================
+// REGISTER TELEGRAM COMMANDS
+// ============================================================
+
+const registerTelegramCommands = async () => {
+  try {
+    console.log("🔄 Registering Telegram commands...");
+
+    // Remove old command list
+    await bot.deleteMyCommands();
+
+    console.log("🗑️ Old Telegram commands deleted");
+
+    // Register new commands
+    await bot.setMyCommands(telegramCommands, {
+      scope: {
+        type: "all_private_chats",
+      },
+    });
+
+    console.log("✅ New Telegram commands registered");
+
+    // Read them back from Telegram
+    const registeredCommands = await bot.getMyCommands({
+      scope: {
+        type: "all_private_chats",
+      },
+    });
+
+    console.log(
+      "📋 Telegram currently has these commands:",
+      registeredCommands,
+    );
+  } catch (error) {
+    console.error("❌ Telegram command registration failed:", error);
+  }
+};
+
+registerTelegramCommands();
 
 // ============================================================
 // SESSIONS
@@ -260,7 +289,7 @@ Ready to play?`,
 };
 
 // ============================================================
-// CHECK ADMIN
+// /CHECKADMIN
 // ============================================================
 
 bot.onText(/^\/checkadmin$/, async (msg) => {
@@ -271,10 +300,12 @@ bot.onText(/^\/checkadmin$/, async (msg) => {
 
     const matched = String(telegramId).trim() === configuredAdminId;
 
+    console.log("================================");
     console.log("🔍 ADMIN DEBUG");
     console.log("Telegram ID:", telegramId);
     console.log("Configured Admin ID:", configuredAdminId);
     console.log("Is Admin:", matched);
+    console.log("================================");
 
     await bot.sendMessage(
       msg.chat.id,
@@ -298,7 +329,7 @@ ${matched ? "YES ✅" : "NO ❌"}`,
 });
 
 // ============================================================
-// MY ID
+// /MYID
 // ============================================================
 
 bot.onText(/^\/myid$/, async (msg) => {
@@ -323,7 +354,7 @@ ${telegramId}`,
 });
 
 // ============================================================
-// ADMIN
+// /ADMIN
 // ============================================================
 
 bot.onText(/^\/admin$/, async (msg) => {
@@ -403,7 +434,7 @@ Choose what you want to change 👇`,
 };
 
 // ============================================================
-// START
+// /START
 // ============================================================
 
 bot.onText(/^\/start$/, async (msg) => {
@@ -427,7 +458,7 @@ bot.onText(/^\/start$/, async (msg) => {
 });
 
 // ============================================================
-// PLAYNOW
+// /PLAYNOW
 // ============================================================
 
 bot.onText(/^\/playnow$/, async (msg) => {
@@ -443,7 +474,7 @@ bot.onText(/^\/playnow$/, async (msg) => {
 });
 
 // ============================================================
-// BALANCE
+// /BALANCE
 // ============================================================
 
 bot.onText(/^\/balance$/, async (msg) => {
@@ -478,7 +509,7 @@ Your wallet balance is available inside Boch Boch.`,
 });
 
 // ============================================================
-// DEPOSIT
+// /DEPOSIT
 // ============================================================
 
 bot.onText(/^\/deposit$/, async (msg) => {
@@ -494,7 +525,7 @@ bot.onText(/^\/deposit$/, async (msg) => {
 });
 
 // ============================================================
-// WITHDRAW
+// /WITHDRAW
 // ============================================================
 
 bot.onText(/^\/withdraw$/, async (msg) => {
@@ -529,7 +560,7 @@ Withdrawal options will be available here.`,
 });
 
 // ============================================================
-// SUPPORT
+// /SUPPORT
 // ============================================================
 
 bot.onText(/^\/support$/, async (msg) => {
@@ -672,17 +703,13 @@ ${settings.account_name}`,
     }
 
     // ========================================================
-    // PLAY BOCH BOCH
+    // PLAYER MENU
     // ========================================================
 
     if (text === "🎮 Play Boch Boch") {
       await sendPlayMessage(chatId);
       return;
     }
-
-    // ========================================================
-    // BALANCE
-    // ========================================================
 
     if (text === "💰 Balance") {
       await bot.sendMessage(
@@ -709,18 +736,10 @@ Your wallet balance is available inside Boch Boch.`,
       return;
     }
 
-    // ========================================================
-    // DEPOSIT
-    // ========================================================
-
     if (text === "➕ Deposit") {
       await sendPaymentMethods(chatId);
       return;
     }
-
-    // ========================================================
-    // WITHDRAW
-    // ========================================================
 
     if (text === "💸 Withdraw") {
       await bot.sendMessage(
@@ -746,10 +765,6 @@ Withdrawal options will be available here.`,
 
       return;
     }
-
-    // ========================================================
-    // SUPPORT
-    // ========================================================
 
     if (text === "🆘 Support") {
       await bot.sendMessage(
@@ -810,7 +825,7 @@ If you have a problem with your account, deposit, withdrawal, or game, please co
     const verification = result.verification;
 
     // ========================================================
-    // CASE 1: BOTH SIDES MATCHED
+    // DEPOSIT APPROVED
     // ========================================================
 
     if (
@@ -840,7 +855,7 @@ Your wallet has been credited successfully.`,
     }
 
     // ========================================================
-    // CASE 2: PLAYER ARRIVED FIRST
+    // WAITING FOR MERCHANT
     // ========================================================
 
     if (
@@ -871,7 +886,7 @@ You do not need to send the SMS again.`,
     }
 
     // ========================================================
-    // CASE 3: ALREADY APPROVED
+    // ALREADY APPROVED
     // ========================================================
 
     if (verification?.reason === "ALREADY_APPROVED") {
@@ -888,7 +903,7 @@ Please check your wallet balance.`,
     }
 
     // ========================================================
-    // CASE 4: OTHER SUCCESSFUL WAITING STATE
+    // OTHER SUCCESSFUL WAITING STATE
     // ========================================================
 
     if (verification?.success === true) {
@@ -907,7 +922,7 @@ Your wallet will be credited automatically once the merchant confirmation is mat
     }
 
     // ========================================================
-    // UNEXPECTED VERIFICATION RESULT
+    // UNEXPECTED RESULT
     // ========================================================
 
     console.warn("⚠️ Unexpected deposit verification result:", {
@@ -950,12 +965,14 @@ bot.on("callback_query", async (query) => {
     }
 
     const chatId = query.message.chat.id;
+
     const action = query.data;
+
     const telegramId = query.from?.id;
 
-    // ========================================================
+    // ======================================================
     // ADMIN AUTHENTICATION
-    // ========================================================
+    // ======================================================
 
     const adminActions = [
       "admin_payment_settings",
@@ -985,18 +1002,19 @@ bot.on("callback_query", async (query) => {
 
     await bot.answerCallbackQuery(query.id);
 
-    // ========================================================
+    // ======================================================
     // ADMIN PAYMENT SETTINGS
-    // ========================================================
+    // ======================================================
 
     if (action === "admin_payment_settings") {
       await sendAdminPaymentSettings(chatId);
+
       return;
     }
 
-    // ========================================================
+    // ======================================================
     // ADMIN CHANGE PHONE
-    // ========================================================
+    // ======================================================
 
     if (action === "admin_change_phone") {
       adminSessions.set(chatId, {
@@ -1019,9 +1037,9 @@ Send /cancel to cancel.`,
       return;
     }
 
-    // ========================================================
+    // ======================================================
     // ADMIN CHANGE NAME
-    // ========================================================
+    // ======================================================
 
     if (action === "admin_change_name") {
       adminSessions.set(chatId, {
@@ -1040,9 +1058,9 @@ Send /cancel to cancel.`,
       return;
     }
 
-    // ========================================================
+    // ======================================================
     // ADMIN BACK
-    // ========================================================
+    // ======================================================
 
     if (action === "admin_back") {
       adminSessions.delete(chatId);
@@ -1052,9 +1070,9 @@ Send /cancel to cancel.`,
       return;
     }
 
-    // ========================================================
+    // ======================================================
     // ADMIN REVENUE
-    // ========================================================
+    // ======================================================
 
     if (action === "admin_revenue") {
       await bot.sendMessage(
@@ -1067,9 +1085,9 @@ Revenue dashboard will be added next.`,
       return;
     }
 
-    // ========================================================
+    // ======================================================
     // ADMIN WITHDRAWALS
-    // ========================================================
+    // ======================================================
 
     if (action === "admin_withdrawals") {
       await bot.sendMessage(
@@ -1082,18 +1100,19 @@ Withdrawal management will be added next.`,
       return;
     }
 
-    // ========================================================
+    // ======================================================
     // DEPOSIT MENU
-    // ========================================================
+    // ======================================================
 
     if (action === "deposit_menu") {
       await sendPaymentMethods(chatId);
+
       return;
     }
 
-    // ========================================================
+    // ======================================================
     // TELEBIRR
-    // ========================================================
+    // ======================================================
 
     if (action === "deposit_telebirr") {
       depositSessions.set(chatId, {
@@ -1150,9 +1169,9 @@ Contact @fastbochboch`,
       return;
     }
 
-    // ========================================================
+    // ======================================================
     // CBE BIRR
-    // ========================================================
+    // ======================================================
 
     if (action === "deposit_cbe_birr") {
       depositSessions.delete(chatId);
@@ -1179,9 +1198,9 @@ CBE Birr deposit instructions will be added next.`,
       return;
     }
 
-    // ========================================================
+    // ======================================================
     // DEPOSIT BACK
-    // ========================================================
+    // ======================================================
 
     if (action === "deposit_back") {
       depositSessions.delete(chatId);
