@@ -5,7 +5,7 @@ let io;
 export const initSocket = (httpServer) => {
   io = new Server(httpServer, {
     cors: {
-      origin: "https://bb1a-196-188-37-214.ngrok-free.app",
+      origin: "https://frontendfastbochboch.vercel.app",
     },
   });
 
