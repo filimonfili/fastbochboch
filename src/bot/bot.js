@@ -11,12 +11,13 @@ import {
 
 console.log("🚨 TELEGRAM BOT INITIALIZED 🚨");
 
-// ===============================
+// ============================================================
 // ENVIRONMENT
-// ===============================
+// ============================================================
 
 const token = process.env.TELEGRAM_BOT_TOKEN;
 const miniAppUrl = process.env.TELEGRAM_MINI_APP_URL;
+const adminTelegramId = process.env.ADMIN_TELEGRAM_ID;
 
 if (!token) {
   throw new Error("TELEGRAM_BOT_TOKEN is missing");
@@ -26,13 +27,29 @@ if (!miniAppUrl) {
   throw new Error("TELEGRAM_MINI_APP_URL is missing");
 }
 
+if (!adminTelegramId) {
+  throw new Error("ADMIN_TELEGRAM_ID is missing");
+}
+
+// ============================================================
+// HELPERS
+// ============================================================
+
 const isValidTelebirrPhone = (phone) => {
   return /^09\d{8}$/.test(phone);
 };
 
-// ===============================
+const isAdmin = (telegramId) => {
+  if (!telegramId) {
+    return false;
+  }
+
+  return String(telegramId).trim() === String(adminTelegramId).trim();
+};
+
+// ============================================================
 // BOT
-// ===============================
+// ============================================================
 
 const bot = new TelegramBot(token, {
   polling: true,
@@ -40,9 +57,13 @@ const bot = new TelegramBot(token, {
 
 console.log("🤖 Telegram bot started");
 
-// ===============================
+console.log("🔐 Admin Telegram ID configured:", {
+  configured: Boolean(adminTelegramId),
+});
+
+// ============================================================
 // TELEGRAM COMMANDS
-// ===============================
+// ============================================================
 
 bot.setMyCommands([
   {
@@ -69,27 +90,22 @@ bot.setMyCommands([
     command: "support",
     description: "Get support",
   },
+  {
+    command: "admin",
+    description: "Open admin panel",
+  },
 ]);
 
-// ===============================
-// DEPOSIT SESSIONS
-// ===============================
+// ============================================================
+// SESSIONS
+// ============================================================
 
 const depositSessions = new Map();
 const adminSessions = new Map();
-const adminTelegramId = process.env.ADMIN_TELEGRAM_ID;
 
-if (!adminTelegramId) {
-  throw new Error("ADMIN_TELEGRAM_ID is missing");
-}
-
-const isAdmin = (telegramId) => {
-  return String(telegramId) === String(adminTelegramId);
-};
-
-// ===============================
+// ============================================================
 // MAIN MENU KEYBOARD
-// ===============================
+// ============================================================
 
 const mainMenuKeyboard = {
   keyboard: [
@@ -122,9 +138,25 @@ const mainMenuKeyboard = {
   is_persistent: true,
 };
 
-// ===============================
+// ============================================================
+// MAIN MENU
+// ============================================================
+
+const sendMainMenu = async (chatId) => {
+  await bot.sendMessage(
+    chatId,
+    `🤖 Fast Boch Boch
+
+Welcome! Choose an option below 👇`,
+    {
+      reply_markup: mainMenuKeyboard,
+    },
+  );
+};
+
+// ============================================================
 // PAYMENT METHODS
-// ===============================
+// ============================================================
 
 const sendPaymentMethods = async (chatId) => {
   await bot.sendMessage(
@@ -147,9 +179,9 @@ Choose your payment method 👇`,
   );
 };
 
-// ===============================
+// ============================================================
 // ADMIN MENU
-// ===============================
+// ============================================================
 
 const sendAdminMenu = async (chatId) => {
   await bot.sendMessage(
@@ -184,9 +216,9 @@ Choose an option below 👇`,
   );
 };
 
-// ===============================
+// ============================================================
 // PLAY MESSAGE
-// ===============================
+// ============================================================
 
 const sendPlayMessage = async (chatId) => {
   await bot.sendMessage(
@@ -210,14 +242,47 @@ Ready to play?`,
     },
   );
 };
-// ===============================
-// /admin
-// ===============================
+
+// ============================================================
+// /MYID
+// ============================================================
+
+bot.onText(/^\/myid$/, async (msg) => {
+  try {
+    const chatId = msg.chat.id;
+    const telegramId = msg.from?.id;
+
+    await bot.sendMessage(
+      chatId,
+      `🆔 Your Telegram ID is:
+
+${telegramId}`,
+    );
+
+    console.log("🆔 Telegram ID requested:", {
+      telegramId,
+      username: msg.from?.username,
+    });
+  } catch (error) {
+    console.error("❌ /myid error:", error);
+  }
+});
+
+// ============================================================
+// /ADMIN
+// ============================================================
 
 bot.onText(/^\/admin$/, async (msg) => {
   try {
     const telegramId = msg.from?.id;
     const chatId = msg.chat.id;
+
+    console.log("🔐 Admin login attempt:", {
+      telegramId,
+      configuredAdminId: adminTelegramId,
+      matched: isAdmin(telegramId),
+      username: msg.from?.username,
+    });
 
     if (!telegramId || !isAdmin(telegramId)) {
       await bot.sendMessage(
@@ -232,14 +297,15 @@ bot.onText(/^\/admin$/, async (msg) => {
 
     await sendAdminMenu(chatId);
 
-    console.log("🔐 Admin panel opened:", telegramId);
+    console.log("✅ Admin panel opened:", telegramId);
   } catch (error) {
     console.error("❌ /admin error:", error);
   }
 });
-// ===============================
+
+// ============================================================
 // ADMIN PAYMENT SETTINGS
-// ===============================
+// ============================================================
 
 const sendAdminPaymentSettings = async (chatId) => {
   const settings = await getTelebirrSettings();
@@ -282,27 +348,32 @@ Choose what you want to change 👇`,
   );
 };
 
-// ===============================
-// /start
-// ===============================
+// ============================================================
+// /START
+// ============================================================
 
 bot.onText(/^\/start$/, async (msg) => {
   try {
     const chatId = msg.chat.id;
 
     depositSessions.delete(chatId);
+    adminSessions.delete(chatId);
 
     await sendMainMenu(chatId);
 
-    console.log("▶️ /start:", chatId);
+    console.log("▶️ /start:", {
+      chatId,
+      telegramId: msg.from?.id,
+      username: msg.from?.username,
+    });
   } catch (error) {
     console.error("❌ /start error:", error);
   }
 });
 
-// ===============================
-// /playnow
-// ===============================
+// ============================================================
+// /PLAYNOW
+// ============================================================
 
 bot.onText(/^\/playnow$/, async (msg) => {
   try {
@@ -316,9 +387,9 @@ bot.onText(/^\/playnow$/, async (msg) => {
   }
 });
 
-// ===============================
-// /balance
-// ===============================
+// ============================================================
+// /BALANCE
+// ============================================================
 
 bot.onText(/^\/balance$/, async (msg) => {
   try {
@@ -351,9 +422,9 @@ Your wallet balance is available inside Boch Boch.`,
   }
 });
 
-// ===============================
-// /deposit
-// ===============================
+// ============================================================
+// /DEPOSIT
+// ============================================================
 
 bot.onText(/^\/deposit$/, async (msg) => {
   try {
@@ -367,9 +438,9 @@ bot.onText(/^\/deposit$/, async (msg) => {
   }
 });
 
-// ===============================
-// /withdraw
-// ===============================
+// ============================================================
+// /WITHDRAW
+// ============================================================
 
 bot.onText(/^\/withdraw$/, async (msg) => {
   try {
@@ -402,9 +473,9 @@ Withdrawal options will be available here.`,
   }
 });
 
-// ===============================
-// /support
-// ===============================
+// ============================================================
+// /SUPPORT
+// ============================================================
 
 bot.onText(/^\/support$/, async (msg) => {
   try {
@@ -423,9 +494,9 @@ If you have a problem with your account, deposit, withdrawal, or game, please co
   }
 });
 
-// ===============================
+// ============================================================
 // TEXT MESSAGE HANDLER
-// ===============================
+// ============================================================
 
 bot.on("message", async (msg) => {
   try {
@@ -435,19 +506,19 @@ bot.on("message", async (msg) => {
 
     const chatId = msg.chat.id;
     const text = msg.text.trim();
-    // ===============================
-    // ADMIN SESSION
-    // ===============================
-
     const telegramId = msg.from?.id;
+
+    // ========================================================
+    // ADMIN SESSION
+    // ========================================================
 
     if (telegramId && isAdmin(telegramId)) {
       const adminSession = adminSessions.get(chatId);
 
       if (adminSession) {
-        // -------------------------------
+        // ----------------------------------------------------
         // CANCEL
-        // -------------------------------
+        // ----------------------------------------------------
 
         if (text === "/cancel") {
           adminSessions.delete(chatId);
@@ -459,9 +530,9 @@ bot.on("message", async (msg) => {
           return;
         }
 
-        // -------------------------------
+        // ----------------------------------------------------
         // CHANGE TELEBIRR PHONE
-        // -------------------------------
+        // ----------------------------------------------------
 
         if (adminSession.action === "CHANGE_TELEBIRR_PHONE") {
           if (!isValidTelebirrPhone(text)) {
@@ -497,12 +568,14 @@ ${settings.account_name}`,
             phoneNumber: settings.phone_number,
           });
 
+          await sendAdminMenu(chatId);
+
           return;
         }
 
-        // -------------------------------
+        // ----------------------------------------------------
         // CHANGE TELEBIRR ACCOUNT NAME
-        // -------------------------------
+        // ----------------------------------------------------
 
         if (adminSession.action === "CHANGE_TELEBIRR_NAME") {
           if (text.length < 2 || text.length > 100) {
@@ -536,22 +609,25 @@ ${settings.account_name}`,
             accountName: settings.account_name,
           });
 
+          await sendAdminMenu(chatId);
+
           return;
         }
       }
     }
-    // ===============================
+
+    // ========================================================
     // PLAY BOCH BOCH
-    // ===============================
+    // ========================================================
 
     if (text === "🎮 Play Boch Boch") {
       await sendPlayMessage(chatId);
       return;
     }
 
-    // ===============================
+    // ========================================================
     // BALANCE
-    // ===============================
+    // ========================================================
 
     if (text === "💰 Balance") {
       await bot.sendMessage(
@@ -578,18 +654,18 @@ Your wallet balance is available inside Boch Boch.`,
       return;
     }
 
-    // ===============================
+    // ========================================================
     // DEPOSIT
-    // ===============================
+    // ========================================================
 
     if (text === "➕ Deposit") {
       await sendPaymentMethods(chatId);
       return;
     }
 
-    // ===============================
+    // ========================================================
     // WITHDRAW
-    // ===============================
+    // ========================================================
 
     if (text === "💸 Withdraw") {
       await bot.sendMessage(
@@ -616,9 +692,9 @@ Withdrawal options will be available here.`,
       return;
     }
 
-    // ===============================
+    // ========================================================
     // SUPPORT
-    // ===============================
+    // ========================================================
 
     if (text === "🆘 Support") {
       await bot.sendMessage(
@@ -631,17 +707,17 @@ If you have a problem with your account, deposit, withdrawal, or game, please co
       return;
     }
 
-    // ===============================
+    // ========================================================
     // IGNORE COMMANDS
-    // ===============================
+    // ========================================================
 
     if (text.startsWith("/")) {
       return;
     }
 
-    // ===============================
+    // ========================================================
     // DEPOSIT SESSION
-    // ===============================
+    // ========================================================
 
     const session = depositSessions.get(chatId);
 
@@ -655,20 +731,20 @@ If you have a problem with your account, deposit, withdrawal, or game, please co
 
     console.log("📥 Player Telebirr message received:", {
       chatId,
-      telegramId: msg.from?.id,
+      telegramId,
       text,
     });
 
-    if (!msg.from?.id) {
+    if (!telegramId) {
       throw new Error("Telegram user ID is missing");
     }
 
-    // ===============================
+    // ========================================================
     // CREATE / RECONCILE DEPOSIT
-    // ===============================
+    // ========================================================
 
     const result = await createPendingDeposit({
-      telegramId: msg.from.id,
+      telegramId,
       paymentMethod: "TELEBIRR",
       playerMessage: text,
     });
@@ -678,9 +754,9 @@ If you have a problem with your account, deposit, withdrawal, or game, please co
     const deposit = result.deposit;
     const verification = result.verification;
 
-    // ==========================================
+    // ========================================================
     // CASE 1: BOTH SIDES MATCHED
-    // ==========================================
+    // ========================================================
 
     if (
       verification?.success === true &&
@@ -707,9 +783,9 @@ Your wallet has been credited successfully.`,
       return;
     }
 
-    // ==========================================
+    // ========================================================
     // CASE 2: PLAYER ARRIVED FIRST
-    // ==========================================
+    // ========================================================
 
     if (
       verification?.success === true &&
@@ -738,9 +814,9 @@ You do not need to send the SMS again.`,
       return;
     }
 
-    // ==========================================
+    // ========================================================
     // CASE 3: ALREADY APPROVED
-    // ==========================================
+    // ========================================================
 
     if (verification?.reason === "ALREADY_APPROVED") {
       depositSessions.delete(chatId);
@@ -755,9 +831,9 @@ Please check your wallet balance.`,
       return;
     }
 
-    // ==========================================
-    // OTHER SUCCESSFUL WAITING STATE
-    // ==========================================
+    // ========================================================
+    // CASE 4: OTHER SUCCESSFUL WAITING STATE
+    // ========================================================
 
     if (verification?.success === true) {
       depositSessions.delete(chatId);
@@ -774,9 +850,9 @@ Your wallet will be credited automatically once the merchant confirmation is mat
       return;
     }
 
-    // ==========================================
+    // ========================================================
     // UNEXPECTED VERIFICATION RESULT
-    // ==========================================
+    // ========================================================
 
     console.warn("⚠️ Unexpected deposit verification result:", {
       deposit,
@@ -792,20 +868,24 @@ The payment is still being verified. Please wait for confirmation.`,
 
     depositSessions.delete(chatId);
   } catch (error) {
-    console.error("❌ Failed to create pending deposit:", error);
+    console.error("❌ Failed to process message:", error);
 
-    await bot.sendMessage(
-      msg.chat.id,
-      `❌ We couldn't process your payment information.
+    try {
+      await bot.sendMessage(
+        msg.chat.id,
+        `❌ We couldn't process your payment information.
 
 Please check the SMS or FT reference and try again.`,
-    );
+      );
+    } catch (sendError) {
+      console.error("❌ Failed to send error message:", sendError);
+    }
   }
 });
 
-// ===============================
+// ============================================================
 // CALLBACK QUERIES
-// ===============================
+// ============================================================
 
 bot.on("callback_query", async (query) => {
   try {
@@ -815,11 +895,11 @@ bot.on("callback_query", async (query) => {
 
     const chatId = query.message.chat.id;
     const action = query.data;
-    // ===============================
-    // ADMIN AUTHENTICATION
-    // ===============================
-
     const telegramId = query.from?.id;
+
+    // ========================================================
+    // ADMIN AUTHENTICATION
+    // ========================================================
 
     const adminActions = [
       "admin_payment_settings",
@@ -837,23 +917,30 @@ bot.on("callback_query", async (query) => {
           show_alert: true,
         });
 
+        console.log("🚫 Unauthorized admin callback:", {
+          telegramId,
+          action,
+          configuredAdminId: adminTelegramId,
+        });
+
         return;
       }
     }
 
     await bot.answerCallbackQuery(query.id);
-    // ===============================
+
+    // ========================================================
     // ADMIN PAYMENT SETTINGS
-    // ===============================
+    // ========================================================
 
     if (action === "admin_payment_settings") {
       await sendAdminPaymentSettings(chatId);
       return;
     }
 
-    // ===============================
+    // ========================================================
     // ADMIN CHANGE PHONE
-    // ===============================
+    // ========================================================
 
     if (action === "admin_change_phone") {
       adminSessions.set(chatId, {
@@ -875,9 +962,9 @@ Send /cancel to cancel.`,
       return;
     }
 
-    // ===============================
+    // ========================================================
     // ADMIN CHANGE NAME
-    // ===============================
+    // ========================================================
 
     if (action === "admin_change_name") {
       adminSessions.set(chatId, {
@@ -896,20 +983,21 @@ Send /cancel to cancel.`,
       return;
     }
 
-    // ===============================
+    // ========================================================
     // ADMIN BACK
-    // ===============================
+    // ========================================================
 
     if (action === "admin_back") {
       adminSessions.delete(chatId);
 
       await sendAdminMenu(chatId);
+
       return;
     }
 
-    // ===============================
-    // NOT IMPLEMENTED YET
-    // ===============================
+    // ========================================================
+    // ADMIN REVENUE
+    // ========================================================
 
     if (action === "admin_revenue") {
       await bot.sendMessage(
@@ -922,6 +1010,10 @@ Revenue dashboard will be added next.`,
       return;
     }
 
+    // ========================================================
+    // ADMIN WITHDRAWALS
+    // ========================================================
+
     if (action === "admin_withdrawals") {
       await bot.sendMessage(
         chatId,
@@ -932,25 +1024,25 @@ Withdrawal management will be added next.`,
 
       return;
     }
-    // ===============================
+
+    // ========================================================
     // DEPOSIT MENU
-    // ===============================
+    // ========================================================
 
     if (action === "deposit_menu") {
       await sendPaymentMethods(chatId);
       return;
     }
 
-    // ===============================
+    // ========================================================
     // TELEBIRR
-    // ===============================
+    // ========================================================
 
     if (action === "deposit_telebirr") {
       depositSessions.set(chatId, {
         paymentMethod: "TELEBIRR",
       });
 
-      // Get the current Telebirr settings from Supabase
       const settings = await getTelebirrSettings();
 
       await bot.sendMessage(
@@ -999,9 +1091,9 @@ Contact @fastbochboch`,
       return;
     }
 
-    // ===============================
+    // ========================================================
     // CBE BIRR
-    // ===============================
+    // ========================================================
 
     if (action === "deposit_cbe_birr") {
       depositSessions.delete(chatId);
@@ -1028,9 +1120,9 @@ CBE Birr deposit instructions will be added next.`,
       return;
     }
 
-    // ===============================
-    // BACK
-    // ===============================
+    // ========================================================
+    // DEPOSIT BACK
+    // ========================================================
 
     if (action === "deposit_back") {
       depositSessions.delete(chatId);
@@ -1044,16 +1136,16 @@ CBE Birr deposit instructions will be added next.`,
   }
 });
 
-// ===============================
+// ============================================================
 // POLLING ERROR
-// ===============================
+// ============================================================
 
 bot.on("polling_error", (error) => {
   console.error("🤖 Telegram polling error:", error.message);
 });
 
-// ===============================
+// ============================================================
 // EXPORT
-// ===============================
+// ============================================================
 
 export default bot;
