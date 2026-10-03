@@ -3,6 +3,7 @@ import "dotenv/config";
 import TelegramBot from "node-telegram-bot-api";
 
 import { createPendingDeposit } from "../services/depositService.js";
+
 import {
   getTelebirrSettings,
   updateTelebirrPhone,
@@ -57,7 +58,7 @@ const bot = new TelegramBot(token, {
 
 console.log("🤖 Telegram bot started");
 
-console.log("🔐 Admin Telegram ID configured:", {
+console.log("🔐 Admin configuration loaded:", {
   configured: Boolean(adminTelegramId),
 });
 
@@ -65,37 +66,51 @@ console.log("🔐 Admin Telegram ID configured:", {
 // TELEGRAM COMMANDS
 // ============================================================
 
-bot.setMyCommands([
-  {
-    command: "start",
-    description: "Start Fast Boch Boch",
-  },
-  {
-    command: "playnow",
-    description: "Play Boch Boch",
-  },
-  {
-    command: "balance",
-    description: "Check wallet balance",
-  },
-  {
-    command: "deposit",
-    description: "Deposit money",
-  },
-  {
-    command: "withdraw",
-    description: "Withdraw money",
-  },
-  {
-    command: "support",
-    description: "Get support",
-  },
-  {
-    command: "admin",
-    description: "Open admin panel",
-  },
-  { command: "checkadmin", description: "Check admin access" },
-]);
+bot
+  .setMyCommands([
+    {
+      command: "start",
+      description: "Start Fast Boch Boch",
+    },
+    {
+      command: "playnow",
+      description: "Play Boch Boch",
+    },
+    {
+      command: "balance",
+      description: "Check wallet balance",
+    },
+    {
+      command: "deposit",
+      description: "Deposit money",
+    },
+    {
+      command: "withdraw",
+      description: "Withdraw money",
+    },
+    {
+      command: "support",
+      description: "Get support",
+    },
+    {
+      command: "admin",
+      description: "Open admin panel",
+    },
+    {
+      command: "myid",
+      description: "Show Telegram ID",
+    },
+    {
+      command: "checkadmin",
+      description: "Check admin access",
+    },
+  ])
+  .then(() => {
+    console.log("✅ Telegram commands registered successfully");
+  })
+  .catch((error) => {
+    console.error("❌ Failed to register Telegram commands:", error);
+  });
 
 // ============================================================
 // SESSIONS
@@ -243,28 +258,39 @@ Ready to play?`,
     },
   );
 };
+
+// ============================================================
+// CHECK ADMIN
+// ============================================================
+
 bot.onText(/^\/checkadmin$/, async (msg) => {
   try {
     const telegramId = msg.from?.id;
+
     const configuredAdminId = String(adminTelegramId).trim();
+
+    const matched = String(telegramId).trim() === configuredAdminId;
 
     console.log("🔍 ADMIN DEBUG");
     console.log("Telegram ID:", telegramId);
     console.log("Configured Admin ID:", configuredAdminId);
-    console.log("Is Admin:", String(telegramId) === configuredAdminId);
+    console.log("Is Admin:", matched);
 
     await bot.sendMessage(
       msg.chat.id,
       `🔍 Admin Debug
 
 Your Telegram ID:
+
 ${telegramId}
 
 Configured Admin ID:
+
 ${configuredAdminId}
 
 Is Admin:
-${String(telegramId) === configuredAdminId ? "YES ✅" : "NO ❌"}`,
+
+${matched ? "YES ✅" : "NO ❌"}`,
     );
   } catch (error) {
     console.error("❌ /checkadmin error:", error);
@@ -272,7 +298,7 @@ ${String(telegramId) === configuredAdminId ? "YES ✅" : "NO ❌"}`,
 });
 
 // ============================================================
-// /MYID
+// MY ID
 // ============================================================
 
 bot.onText(/^\/myid$/, async (msg) => {
@@ -297,7 +323,7 @@ ${telegramId}`,
 });
 
 // ============================================================
-// /ADMIN
+// ADMIN
 // ============================================================
 
 bot.onText(/^\/admin$/, async (msg) => {
@@ -377,7 +403,7 @@ Choose what you want to change 👇`,
 };
 
 // ============================================================
-// /START
+// START
 // ============================================================
 
 bot.onText(/^\/start$/, async (msg) => {
@@ -393,6 +419,7 @@ bot.onText(/^\/start$/, async (msg) => {
       chatId,
       telegramId: msg.from?.id,
       username: msg.from?.username,
+      isAdmin: isAdmin(msg.from?.id),
     });
   } catch (error) {
     console.error("❌ /start error:", error);
@@ -400,7 +427,7 @@ bot.onText(/^\/start$/, async (msg) => {
 });
 
 // ============================================================
-// /PLAYNOW
+// PLAYNOW
 // ============================================================
 
 bot.onText(/^\/playnow$/, async (msg) => {
@@ -416,7 +443,7 @@ bot.onText(/^\/playnow$/, async (msg) => {
 });
 
 // ============================================================
-// /BALANCE
+// BALANCE
 // ============================================================
 
 bot.onText(/^\/balance$/, async (msg) => {
@@ -451,7 +478,7 @@ Your wallet balance is available inside Boch Boch.`,
 });
 
 // ============================================================
-// /DEPOSIT
+// DEPOSIT
 // ============================================================
 
 bot.onText(/^\/deposit$/, async (msg) => {
@@ -467,7 +494,7 @@ bot.onText(/^\/deposit$/, async (msg) => {
 });
 
 // ============================================================
-// /WITHDRAW
+// WITHDRAW
 // ============================================================
 
 bot.onText(/^\/withdraw$/, async (msg) => {
@@ -502,7 +529,7 @@ Withdrawal options will be available here.`,
 });
 
 // ============================================================
-// /SUPPORT
+// SUPPORT
 // ============================================================
 
 bot.onText(/^\/support$/, async (msg) => {
@@ -797,6 +824,7 @@ If you have a problem with your account, deposit, withdrawal, or game, please co
         `✅ Deposit Accepted!
 
 💰 Amount: ${verification.amount} ETB
+
 💳 New Balance: ${verification.new_balance} ETB
 
 Your wallet has been credited successfully.`,
@@ -982,6 +1010,7 @@ bot.on("callback_query", async (query) => {
 Send the new Telebirr number.
 
 Example:
+
 0912345678
 
 Send /cancel to cancel.`,
@@ -1080,6 +1109,7 @@ Withdrawal management will be added next.`,
 Send your payment to:
 
 📞 ${settings.phone_number}
+
 👤 ${settings.account_name}
 
 ━━━━━━━━━━━━━━━
@@ -1101,6 +1131,7 @@ Your wallet will be credited automatically after verification.
 ━━━━━━━━━━━━━━━
 
 🆘 Need help?
+
 Contact @fastbochboch`,
         {
           reply_markup: {
