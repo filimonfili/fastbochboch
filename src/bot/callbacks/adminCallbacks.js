@@ -135,17 +135,33 @@ Send /cancel to cancel.`,
       if (action === "admin_revenue") {
         console.log("📊 Loading admin revenue...");
 
-        const revenue = await getRevenue();
+        try {
+          const revenue = await getRevenue();
 
-        console.log("📊 Revenue result:", revenue);
+          console.log("📊 Revenue result:", revenue);
 
-        await sendAdminRevenue(bot, chatId, revenue);
+          await sendAdminRevenue(bot, chatId, revenue);
 
-        console.log("✅ Revenue sent to admin");
+          console.log("✅ Revenue sent to admin");
+        } catch (error) {
+          console.error("🔥 REVENUE ERROR:", error);
+          console.error("🔥 REVENUE ERROR MESSAGE:", error?.message);
+          console.error("🔥 REVENUE ERROR DETAILS:", error?.details);
+          console.error("🔥 REVENUE ERROR HINT:", error?.hint);
+          console.error("🔥 REVENUE ERROR CODE:", error?.code);
+
+          await bot.sendMessage(
+            chatId,
+            `❌ Revenue Error
+
+${error?.message || "Unknown error"}
+
+Check the server logs for details.`,
+          );
+        }
 
         return;
       }
-
       // ----------------------------------------------------------
       // WITHDRAWALS
       // ----------------------------------------------------------
