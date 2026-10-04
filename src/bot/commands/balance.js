@@ -1,11 +1,25 @@
-// bot/utils/auth.js
+import { sendBalanceMessage } from "../menus/mainMenu.js";
 
-const adminTelegramId = process.env.ADMIN_TELEGRAM_ID;
+export const registerBalanceCommand = (bot) => {
+  bot.onText(/^\/balance$/, async (msg) => {
+    try {
+      await sendBalanceMessage(bot, msg.chat.id);
 
-export const isAdmin = (telegramId) => {
-  if (!telegramId || !adminTelegramId) {
-    return false;
-  }
+      console.log("💰 /balance:", {
+        chatId: msg.chat.id,
+        telegramId: msg.from?.id,
+      });
+    } catch (error) {
+      console.error("❌ /balance error:", error);
 
-  return String(telegramId).trim() === String(adminTelegramId).trim();
+      try {
+        await bot.sendMessage(
+          msg.chat.id,
+          "❌ Unable to check your balance right now.",
+        );
+      } catch (sendError) {
+        console.error("❌ Failed to send balance error:", sendError);
+      }
+    }
+  });
 };
