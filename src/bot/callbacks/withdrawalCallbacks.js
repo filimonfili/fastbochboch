@@ -166,7 +166,14 @@ Please start the withdrawal again.`,
         } catch (error) {
           console.error("❌ Withdrawal creation failed:", error);
 
-          const errorMessage = error?.message || "";
+          console.error("🔥🔥🔥 WITHDRAWAL ERROR FROM SERVICE 🔥🔥🔥");
+          console.error("FULL ERROR:", error);
+          console.error("MESSAGE:", error?.message);
+          console.error("DETAILS:", error?.details);
+          console.error("HINT:", error?.hint);
+          console.error("CODE:", error?.code);
+
+          const errorMessage = error?.message || error?.details || "";
 
           // ----------------------------------------------------
           // ZERO BALANCE
