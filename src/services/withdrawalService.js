@@ -1,31 +1,40 @@
 import supabase from "../config/supabase.js";
 
-// ============================================================
-// CREATE WITHDRAWAL
-// ============================================================
-
 export const createWithdrawal = async ({
   userId,
   amount,
   paymentMethod,
   accountNumber,
 }) => {
+  console.log("💸 Calling create_withdrawal RPC:", {
+    userId,
+    amount,
+    paymentMethod,
+    accountNumber,
+  });
+
   const { data, error } = await supabase.rpc("create_withdrawal", {
     p_user_id: userId,
-    p_amount: amount,
+    p_amount: Number(amount),
     p_payment_method: paymentMethod,
     p_account_number: accountNumber,
   });
 
   if (error) {
-    console.error("❌ Create withdrawal RPC failed:", error);
+    console.error("❌ CREATE WITHDRAWAL RPC ERROR");
+    console.error("message:", error.message);
+    console.error("details:", error.details);
+    console.error("hint:", error.hint);
+    console.error("code:", error.code);
+    console.error("full error:", error);
 
     throw error;
   }
 
+  console.log("✅ CREATE WITHDRAWAL RPC RESULT:", data);
+
   return data;
 };
-
 // ============================================================
 // GET USER WITHDRAWALS
 // ============================================================
