@@ -249,19 +249,6 @@ Example:
           // MINIMUM WITHDRAWAL
           // -----------------------------------------------------
 
-          const MIN_WITHDRAWAL = 50;
-
-          if (amount < MIN_WITHDRAWAL) {
-            await bot.sendMessage(
-              chatId,
-              `❌ Minimum withdrawal is ${MIN_WITHDRAWAL} ETB.
-
-Please enter an amount of ${MIN_WITHDRAWAL} ETB or more.`,
-            );
-
-            return;
-          }
-
           // -----------------------------------------------------
           // CHECK CURRENT BALANCE AGAIN
           // -----------------------------------------------------
