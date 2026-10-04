@@ -13,6 +13,8 @@ import {
 
 import { createPendingDeposit } from "../services/depositService.js";
 
+import { rejectWithdrawal } from "../services/adminWithdrawalService.js";
+
 import { sendMainMenu } from "./menus/mainMenu.js";
 
 import { sendPaymentMethods } from "./menus/depositMenu.js";
@@ -20,6 +22,8 @@ import { sendPaymentMethods } from "./menus/depositMenu.js";
 import { sendAdminMenu } from "./menus/adminMenu.js";
 
 import { startWithdrawal } from "./commands/withdraw.js";
+
+import supabase from "../config/supabase.js";
 
 export const registerMessageHandler = (bot) => {
   bot.on("message", async (msg) => {
@@ -139,6 +143,188 @@ ${settings.account_name}`,
 
             return;
           }
+
+          // -----------------------------------------------------
+          // REJECT WITHDRAWAL
+          // -----------------------------------------------------
+
+          if (adminSession.action === "REJECT_WITHDRAWAL") {
+            const reason = text.trim();
+
+            if (reason.length < 2 || reason.length > 300) {
+              await bot.sendMessage(
+                chatId,
+                `❌ Invalid rejection reason.
+
+Please enter a reason between 2 and 300 characters.
+
+Example:
+
+Invalid receiving number`,
+              );
+
+              return;
+            }
+
+            const withdrawalId = adminSession.withdrawalId;
+
+            if (!withdrawalId) {
+              adminSessions.delete(chatId);
+
+              await bot.sendMessage(
+                chatId,
+                `❌ Withdrawal session is invalid.
+
+Please open the withdrawal request again.`,
+              );
+
+              return;
+            }
+
+            try {
+              console.log("❌ Rejecting withdrawal:", {
+                adminTelegramId: telegramId,
+                withdrawalId,
+                reason,
+              });
+
+              const result = await rejectWithdrawal(withdrawalId, reason);
+
+              adminSessions.delete(chatId);
+
+              // -------------------------------------------------
+              // ADMIN CONFIRMATION
+              // -------------------------------------------------
+
+              await bot.sendMessage(
+                chatId,
+                `❌ Withdrawal Rejected
+
+💰 Amount:
+${Number(result.amount).toLocaleString()} ETB
+
+💸 Refund:
+${Number(result.refund_amount).toLocaleString()} ETB
+
+📝 Reason:
+${reason}
+
+The player's money has been refunded automatically.`,
+              );
+
+              // -------------------------------------------------
+              // FIND PLAYER
+              // -------------------------------------------------
+
+              const { data: user, error: userError } = await supabase
+                .from("users")
+                .select("telegram_id")
+                .eq("id", result.user_id)
+                .single();
+
+              if (userError) {
+                console.error(
+                  "❌ Failed to find withdrawal player:",
+                  userError,
+                );
+              }
+
+              // -------------------------------------------------
+              // NOTIFY PLAYER
+              // -------------------------------------------------
+
+              if (user?.telegram_id) {
+                try {
+                  await bot.sendMessage(
+                    user.telegram_id,
+                    `❌ Withdrawal Rejected
+
+💰 Requested Amount:
+${Number(result.amount).toLocaleString()} ETB
+
+📝 Reason:
+${reason}
+
+💰 Refund:
+${Number(result.refund_amount).toLocaleString()} ETB
+
+The withdrawal amount has been returned to your wallet.
+
+You can submit another withdrawal request if needed.`,
+                  );
+
+                  console.log("📨 Player notified about rejected withdrawal:", {
+                    telegramId: user.telegram_id,
+                    withdrawalId,
+                  });
+                } catch (notificationError) {
+                  console.error(
+                    "❌ Failed to notify player about rejected withdrawal:",
+                    notificationError,
+                  );
+                }
+              }
+
+              console.log("✅ Withdrawal rejected and refunded:", result);
+
+              await sendAdminMenu(bot, chatId);
+
+              return;
+            } catch (error) {
+              console.error("❌ Reject withdrawal error:", error);
+
+              const message = error?.message || "";
+
+              // -----------------------------------------------
+              // ALREADY PROCESSED
+              // -----------------------------------------------
+
+              if (message.includes("WITHDRAWAL_ALREADY_PROCESSED")) {
+                adminSessions.delete(chatId);
+
+                await bot.sendMessage(
+                  chatId,
+                  `⚠️ This withdrawal has already been processed.
+
+It cannot be rejected again.`,
+                );
+
+                return;
+              }
+
+              // -----------------------------------------------
+              // NOT FOUND
+              // -----------------------------------------------
+
+              if (message.includes("WITHDRAWAL_NOT_FOUND")) {
+                adminSessions.delete(chatId);
+
+                await bot.sendMessage(
+                  chatId,
+                  `❌ Withdrawal not found.
+
+The request may have already been removed or processed.`,
+                );
+
+                return;
+              }
+
+              // -----------------------------------------------
+              // UNKNOWN ERROR
+              // -----------------------------------------------
+
+              await bot.sendMessage(
+                chatId,
+                `❌ Failed to reject withdrawal.
+
+The player's balance was not changed.
+
+Please try again.`,
+              );
+
+              return;
+            }
+          }
         }
       }
 
@@ -146,8 +332,13 @@ ${settings.account_name}`,
       // PLAYER MENU BUTTONS
       // =========================================================
 
+      // ---------------------------------------------------------
+      // PLAY
+      // ---------------------------------------------------------
+
       if (text === "🎮 Play Boch Boch") {
         await sendMainMenu(bot, chatId);
+
         return;
       }
 
@@ -182,6 +373,7 @@ Your wallet balance is available inside Boch Boch.`,
 
       if (text === "💸 Withdraw") {
         await startWithdrawal(bot, msg);
+
         return;
       }
 
@@ -249,8 +441,21 @@ Example:
           // MINIMUM WITHDRAWAL
           // -----------------------------------------------------
 
+          const MIN_WITHDRAWAL = 5;
+
+          if (amount < MIN_WITHDRAWAL) {
+            await bot.sendMessage(
+              chatId,
+              `❌ Minimum withdrawal is ${MIN_WITHDRAWAL} ETB.
+
+Please enter an amount of ${MIN_WITHDRAWAL} ETB or more.`,
+            );
+
+            return;
+          }
+
           // -----------------------------------------------------
-          // CHECK CURRENT BALANCE AGAIN
+          // CHECK BALANCE
           // -----------------------------------------------------
 
           const currentBalance = withdrawalSession.balance;

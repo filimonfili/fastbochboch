@@ -1,5 +1,7 @@
 import { withdrawalSessions } from "../sessions/sessions.js";
 
+import { createWithdrawal } from "../../services/withdrawalService.js";
+
 export const registerWithdrawalCallbacks = (bot) => {
   bot.on("callback_query", async (query) => {
     if (!query.message) {
@@ -8,12 +10,12 @@ export const registerWithdrawalCallbacks = (bot) => {
 
     const action = query.data;
     const chatId = query.message.chat.id;
-    const telegramId = query.from?.id;
 
     const withdrawalActions = [
       "withdraw_telebirr",
       "withdraw_cbe_birr",
       "withdraw_cancel",
+      "withdraw_confirm",
     ];
 
     if (!withdrawalActions.includes(action)) {
@@ -21,10 +23,6 @@ export const registerWithdrawalCallbacks = (bot) => {
     }
 
     try {
-      // ========================================================
-      // ANSWER CALLBACK
-      // ========================================================
-
       await bot.answerCallbackQuery(query.id);
 
       // ========================================================
@@ -112,6 +110,164 @@ Example:
 
 Send /cancel to cancel.`,
         );
+
+        return;
+      }
+
+      // ========================================================
+      // CONFIRM WITHDRAWAL
+      // ========================================================
+
+      if (action === "withdraw_confirm") {
+        // ------------------------------------------------------
+        // SESSION VALIDATION
+        // ------------------------------------------------------
+
+        if (
+          session.step !== "CONFIRM" ||
+          !session.userId ||
+          !session.amount ||
+          !session.paymentMethod ||
+          !session.accountNumber
+        ) {
+          withdrawalSessions.delete(chatId);
+
+          await bot.sendMessage(
+            chatId,
+            `⚠️ Your withdrawal session is invalid or expired.
+
+Please start the withdrawal again.`,
+          );
+
+          return;
+        }
+
+        // ------------------------------------------------------
+        // CREATE WITHDRAWAL
+        // ------------------------------------------------------
+
+        console.log("💸 Creating withdrawal:", {
+          chatId,
+          userId: session.userId,
+          amount: session.amount,
+          paymentMethod: session.paymentMethod,
+          accountNumber: session.accountNumber,
+        });
+
+        let result;
+
+        try {
+          result = await createWithdrawal({
+            userId: session.userId,
+            amount: session.amount,
+            paymentMethod: session.paymentMethod,
+            accountNumber: session.accountNumber,
+          });
+        } catch (error) {
+          console.error("❌ Withdrawal creation failed:", error);
+
+          const errorMessage = error?.message || "";
+
+          // ----------------------------------------------------
+          // ZERO BALANCE
+          // ----------------------------------------------------
+
+          if (errorMessage.includes("NO_BALANCE")) {
+            withdrawalSessions.delete(chatId);
+
+            await bot.sendMessage(
+              chatId,
+              `❌ No money in your account.
+
+Your withdrawal could not be submitted because your balance is 0 ETB.`,
+            );
+
+            return;
+          }
+
+          // ----------------------------------------------------
+          // INSUFFICIENT BALANCE
+          // ----------------------------------------------------
+
+          if (errorMessage.includes("INSUFFICIENT_BALANCE")) {
+            withdrawalSessions.delete(chatId);
+
+            await bot.sendMessage(
+              chatId,
+              `❌ Insufficient Balance
+
+Your available balance is no longer enough for this withdrawal.
+
+Please start the withdrawal again.`,
+            );
+
+            return;
+          }
+
+          // ----------------------------------------------------
+          // OTHER ERROR
+          // ----------------------------------------------------
+
+          await bot.sendMessage(
+            chatId,
+            `❌ We couldn't submit your withdrawal.
+
+Your money has not been withdrawn.
+
+Please try again.`,
+          );
+
+          return;
+        }
+
+        // ------------------------------------------------------
+        // CLEAR SESSION
+        // ------------------------------------------------------
+
+        withdrawalSessions.delete(chatId);
+
+        // ------------------------------------------------------
+        // PAYMENT NAME
+        // ------------------------------------------------------
+
+        const paymentName =
+          session.paymentMethod === "TELEBIRR" ? "Telebirr" : "CBE Birr";
+
+        // ------------------------------------------------------
+        // WITHDRAWAL ID
+        // ------------------------------------------------------
+
+        const withdrawalId = result?.withdrawal_id;
+
+        // ------------------------------------------------------
+        // PLAYER CONFIRMATION
+        // ------------------------------------------------------
+
+        await bot.sendMessage(
+          chatId,
+          `✅ Withdrawal Request Submitted
+
+💰 Amount:
+${session.amount} ETB
+
+📱 Method:
+${paymentName}
+
+📞 Number:
+${session.accountNumber}
+
+⏳ Status:
+Pending
+
+🆔 Request:
+${withdrawalId}
+
+Your withdrawal request has been sent for processing.
+
+Please wait for confirmation from the admin.`,
+        );
+
+        console.log("✅ Withdrawal created successfully:", result);
 
         return;
       }

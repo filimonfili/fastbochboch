@@ -1,15 +1,34 @@
-import { getTelebirrSettings } from "../../services/paymentSettingsService.js";
-import { getRevenue } from "../../services/revenueService.js";
+import supabase from "../../config/supabase.js";
 
 import { isAdmin } from "../utils/auth.js";
+
+import {
+  getTelebirrSettings,
+  updateTelebirrPhone,
+  updateTelebirrAccountName,
+} from "../../services/paymentSettingsService.js";
+
+import { getRevenue } from "../../services/revenueService.js";
+
+import {
+  getPendingWithdrawals,
+  getRecentWithdrawals,
+  approveWithdrawal,
+} from "../../services/adminWithdrawalService.js";
 
 import {
   sendAdminMenu,
   sendAdminPaymentSettings,
   sendAdminRevenue,
+  sendAdminWithdrawals,
+  sendPendingWithdrawal,
+  sendRecentWithdrawal,
+  sendAdminAnnouncements,
 } from "../menus/adminMenu.js";
 
-export const registerAdminCallbacks = (bot, adminSessions) => {
+import { adminSessions } from "../sessions/sessions.js";
+
+export const registerAdminCallbacks = (bot) => {
   bot.on("callback_query", async (query) => {
     if (!query.message) {
       return;
@@ -17,25 +36,33 @@ export const registerAdminCallbacks = (bot, adminSessions) => {
 
     const action = query.data;
     const chatId = query.message.chat.id;
+
     const telegramId = query.from?.id;
 
-    const adminActions = [
-      "admin_payment_settings",
-      "admin_change_phone",
-      "admin_change_name",
-      "admin_revenue",
-      "admin_withdrawals",
-      "admin_announcements",
-      "admin_back",
-    ];
+    // ===================================================
+    // ONLY HANDLE ADMIN CALLBACKS
+    // ===================================================
 
-    if (!adminActions.includes(action)) {
+    const isAdminCallback =
+      action === "admin_payment_settings" ||
+      action === "admin_change_phone" ||
+      action === "admin_change_name" ||
+      action === "admin_revenue" ||
+      action === "admin_withdrawals" ||
+      action === "admin_pending_withdrawals" ||
+      action === "admin_recent_withdrawals" ||
+      action === "admin_announcements" ||
+      action === "admin_back" ||
+      action?.startsWith("admin_approve_withdrawal:") ||
+      action?.startsWith("admin_reject_withdrawal:");
+
+    if (!isAdminCallback) {
       return;
     }
 
-    // ============================================================
-    // ADMIN AUTH CHECK
-    // ============================================================
+    // ===================================================
+    // ADMIN SECURITY CHECK
+    // ===================================================
 
     if (!telegramId || !isAdmin(telegramId)) {
       try {
@@ -47,32 +74,28 @@ export const registerAdminCallbacks = (bot, adminSessions) => {
         console.error("❌ Failed to answer unauthorized callback:", error);
       }
 
-      console.log("🚫 Unauthorized admin callback:", {
-        telegramId,
-        action,
-      });
-
       return;
     }
 
-    // ============================================================
-    // ANSWER CALLBACK ONCE
-    // ============================================================
-
     try {
+      // Answer callback exactly once.
       await bot.answerCallbackQuery(query.id);
-    } catch (error) {
-      console.error("❌ Failed to answer callback:", error);
-    }
 
-    // ============================================================
-    // HANDLE ADMIN ACTION
-    // ============================================================
+      // =================================================
+      // BACK TO ADMIN MENU
+      // =================================================
 
-    try {
-      // ----------------------------------------------------------
+      if (action === "admin_back") {
+        adminSessions.delete(chatId);
+
+        await sendAdminMenu(bot, chatId);
+
+        return;
+      }
+
+      // =================================================
       // PAYMENT SETTINGS
-      // ----------------------------------------------------------
+      // =================================================
 
       if (action === "admin_payment_settings") {
         const settings = await getTelebirrSettings();
@@ -82,9 +105,9 @@ export const registerAdminCallbacks = (bot, adminSessions) => {
         return;
       }
 
-      // ----------------------------------------------------------
+      // =================================================
       // CHANGE TELEBIRR PHONE
-      // ----------------------------------------------------------
+      // =================================================
 
       if (action === "admin_change_phone") {
         adminSessions.set(chatId, {
@@ -95,7 +118,7 @@ export const registerAdminCallbacks = (bot, adminSessions) => {
           chatId,
           `📱 Change Telebirr Number
 
-Send the new Telebirr number.
+Please send the new Telebirr phone number.
 
 Example:
 
@@ -107,9 +130,9 @@ Send /cancel to cancel.`,
         return;
       }
 
-      // ----------------------------------------------------------
-      // CHANGE TELEBIRR NAME
-      // ----------------------------------------------------------
+      // =================================================
+      // CHANGE TELEBIRR ACCOUNT NAME
+      // =================================================
 
       if (action === "admin_change_name") {
         adminSessions.set(chatId, {
@@ -120,7 +143,11 @@ Send /cancel to cancel.`,
           chatId,
           `👤 Change Telebirr Account Name
 
-Send the new account name.
+Please send the new account name.
+
+Example:
+
+Filmon Gebremedhin
 
 Send /cancel to cancel.`,
         );
@@ -128,100 +155,339 @@ Send /cancel to cancel.`,
         return;
       }
 
-      // ----------------------------------------------------------
+      // =================================================
       // REVENUE
-      // ----------------------------------------------------------
+      // =================================================
 
       if (action === "admin_revenue") {
-        console.log("📊 Loading admin revenue...");
-
         try {
           const revenue = await getRevenue();
 
-          console.log("📊 Revenue result:", revenue);
-
           await sendAdminRevenue(bot, chatId, revenue);
-
-          console.log("✅ Revenue sent to admin");
         } catch (error) {
-          console.error("🔥 REVENUE ERROR:", error);
-          console.error("🔥 REVENUE ERROR MESSAGE:", error?.message);
-          console.error("🔥 REVENUE ERROR DETAILS:", error?.details);
-          console.error("🔥 REVENUE ERROR HINT:", error?.hint);
-          console.error("🔥 REVENUE ERROR CODE:", error?.code);
+          console.error("❌ Admin revenue error:", error);
 
           await bot.sendMessage(
             chatId,
-            `❌ Revenue Error
+            `❌ Failed to load revenue.
 
-${error?.message || "Unknown error"}
-
-Check the server logs for details.`,
+Please try again.`,
           );
         }
 
         return;
       }
-      // ----------------------------------------------------------
-      // WITHDRAWALS
-      // ----------------------------------------------------------
+
+      // =================================================
+      // WITHDRAWALS MAIN MENU
+      // =================================================
 
       if (action === "admin_withdrawals") {
+        const pending = await getPendingWithdrawals();
+
+        await sendAdminWithdrawals(bot, chatId, pending.length);
+
+        return;
+      }
+
+      // =================================================
+      // PENDING WITHDRAWALS
+      // =================================================
+
+      if (action === "admin_pending_withdrawals") {
+        const pending = await getPendingWithdrawals();
+
+        if (pending.length === 0) {
+          await bot.sendMessage(
+            chatId,
+            `⏳ Pending Withdrawals
+
+There are currently no pending withdrawal requests.`,
+            {
+              reply_markup: {
+                inline_keyboard: [
+                  [
+                    {
+                      text: "🔄 Refresh",
+                      callback_data: "admin_pending_withdrawals",
+                    },
+                  ],
+                  [
+                    {
+                      text: "⬅️ Back",
+                      callback_data: "admin_withdrawals",
+                    },
+                  ],
+                ],
+              },
+            },
+          );
+
+          return;
+        }
+
         await bot.sendMessage(
           chatId,
-          `💸 Withdrawals
+          `⏳ Pending Withdrawals
 
-Withdrawal management will be added next.`,
+There are ${pending.length} pending request(s).`,
+        );
+
+        for (const withdrawal of pending) {
+          await sendPendingWithdrawal(bot, chatId, withdrawal);
+        }
+
+        return;
+      }
+
+      // =================================================
+      // RECENT WITHDRAWALS
+      // =================================================
+
+      if (action === "admin_recent_withdrawals") {
+        const withdrawals = await getRecentWithdrawals();
+
+        if (withdrawals.length === 0) {
+          await bot.sendMessage(
+            chatId,
+            `📜 Recent Withdrawals
+
+No withdrawal history yet.`,
+            {
+              reply_markup: {
+                inline_keyboard: [
+                  [
+                    {
+                      text: "⬅️ Back",
+                      callback_data: "admin_withdrawals",
+                    },
+                  ],
+                ],
+              },
+            },
+          );
+
+          return;
+        }
+
+        await bot.sendMessage(
+          chatId,
+          `📜 Recent Withdrawals
+
+Showing the latest ${withdrawals.length} withdrawal request(s).`,
+        );
+
+        for (const withdrawal of withdrawals) {
+          await sendRecentWithdrawal(bot, chatId, withdrawal);
+        }
+
+        await bot.sendMessage(chatId, "Choose an option 👇", {
+          reply_markup: {
+            inline_keyboard: [
+              [
+                {
+                  text: "🔄 Refresh",
+                  callback_data: "admin_recent_withdrawals",
+                },
+              ],
+              [
+                {
+                  text: "⬅️ Back",
+                  callback_data: "admin_withdrawals",
+                },
+              ],
+            ],
+          },
+        });
+
+        return;
+      }
+
+      // =================================================
+      // APPROVE WITHDRAWAL
+      // =================================================
+
+      if (action.startsWith("admin_approve_withdrawal:")) {
+        const withdrawalId = action.substring(
+          "admin_approve_withdrawal:".length,
+        );
+
+        if (!withdrawalId) {
+          await bot.sendMessage(chatId, "❌ Invalid withdrawal ID.");
+
+          return;
+        }
+
+        try {
+          const result = await approveWithdrawal(withdrawalId);
+
+          const paymentName =
+            result.payment_method === "TELEBIRR" ? "Telebirr" : "CBE Birr";
+
+          // -------------------------------------------
+          // ADMIN CONFIRMATION
+          // -------------------------------------------
+
+          await bot.sendMessage(
+            chatId,
+            `✅ Withdrawal Approved
+
+💰 Amount:
+${Number(result.amount).toLocaleString()} ETB
+
+📱 Method:
+${paymentName}
+
+📞 Receiving Number:
+${result.account_number}
+
+📌 Status:
+COMPLETED
+
+The withdrawal has been marked as completed.`,
+          );
+
+          // -------------------------------------------
+          // FIND PLAYER TELEGRAM ID
+          // -------------------------------------------
+
+          const { data: user, error: userError } = await supabase
+            .from("users")
+            .select("telegram_id")
+            .eq("id", result.user_id)
+            .single();
+
+          if (userError) {
+            console.error("❌ Failed to find withdrawal player:", userError);
+          }
+
+          // -------------------------------------------
+          // NOTIFY PLAYER
+          // -------------------------------------------
+
+          if (user?.telegram_id) {
+            try {
+              await bot.sendMessage(
+                user.telegram_id,
+                `✅ Withdrawal Completed
+
+💰 Amount:
+${Number(result.amount).toLocaleString()} ETB
+
+📱 Method:
+${paymentName}
+
+📞 Sent to:
+${result.account_number}
+
+Your withdrawal request has been completed successfully. 🎉`,
+              );
+            } catch (notificationError) {
+              console.error(
+                "❌ Failed to notify player about completed withdrawal:",
+                notificationError,
+              );
+            }
+          }
+
+          console.log("✅ Withdrawal approved:", result);
+        } catch (error) {
+          console.error("❌ Approve withdrawal error:", error);
+
+          const message = error?.message || "";
+
+          if (message.includes("WITHDRAWAL_ALREADY_PROCESSED")) {
+            await bot.sendMessage(
+              chatId,
+              `⚠️ This withdrawal has already been processed.
+
+It cannot be approved again.`,
+            );
+
+            return;
+          }
+
+          if (message.includes("WITHDRAWAL_NOT_FOUND")) {
+            await bot.sendMessage(chatId, `❌ Withdrawal not found.`);
+
+            return;
+          }
+
+          await bot.sendMessage(
+            chatId,
+            `❌ Failed to approve withdrawal.
+
+No additional wallet operation was performed.
+
+Please try again.`,
+          );
+        }
+
+        return;
+      }
+
+      // =================================================
+      // REJECT WITHDRAWAL
+      // =================================================
+
+      if (action.startsWith("admin_reject_withdrawal:")) {
+        const withdrawalId = action.substring(
+          "admin_reject_withdrawal:".length,
+        );
+
+        if (!withdrawalId) {
+          await bot.sendMessage(chatId, "❌ Invalid withdrawal ID.");
+
+          return;
+        }
+
+        // Store admin session.
+        // The actual rejection happens
+        // after the admin sends the reason.
+        adminSessions.set(chatId, {
+          action: "REJECT_WITHDRAWAL",
+          withdrawalId,
+        });
+
+        await bot.sendMessage(
+          chatId,
+          `❌ Reject Withdrawal
+
+Please enter the reason for rejecting this withdrawal.
+
+Example:
+
+Invalid receiving number
+
+The player's money will be refunded automatically after rejection.
+
+Send /cancel to cancel.`,
         );
 
         return;
       }
 
-      // ----------------------------------------------------------
+      // =================================================
       // ANNOUNCEMENTS
-      // ----------------------------------------------------------
+      // =================================================
 
       if (action === "admin_announcements") {
-        await bot.sendMessage(
-          chatId,
-          `📢 Announcements
-
-Announcement management will be added next.`,
-        );
-
-        return;
-      }
-
-      // ----------------------------------------------------------
-      // BACK
-      // ----------------------------------------------------------
-
-      if (action === "admin_back") {
-        adminSessions.delete(chatId);
-
-        await sendAdminMenu(bot, chatId);
+        await sendAdminAnnouncements(bot, chatId);
 
         return;
       }
     } catch (error) {
-      // IMPORTANT:
-      // Do NOT call answerCallbackQuery here again.
-      // The callback was already answered above.
-
-      console.error("❌ Admin callback action failed:", {
-        action,
-        telegramId,
-        chatId,
-        error,
-      });
+      console.error("❌ Admin callback error:", error);
 
       try {
         await bot.sendMessage(
           chatId,
-          "❌ Something went wrong. Please try again.",
+          `❌ Something went wrong.
+
+Please try again.`,
         );
       } catch (sendError) {
-        console.error("❌ Failed to send admin error message:", sendError);
+        console.error("❌ Failed to send admin error:", sendError);
       }
     }
   });
