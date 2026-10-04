@@ -20,50 +20,17 @@ console.log("====================================");
 console.log("🚨 FAST BOCH BOCH BOT INITIALIZED 🚨");
 console.log("====================================");
 
-// =========================================================
-// REGISTER COMMANDS
-// =========================================================
+await registerCommands(bot);
+registerCallbacks(bot);
+registerMessageHandler(bot);
 
-try {
-  registerCommands(bot);
-  console.log("✅ Telegram commands registered");
-} catch (error) {
-  console.error("❌ Failed to register commands:", error);
-}
-
-// =========================================================
-// REGISTER CALLBACKS
-// =========================================================
-
-try {
-  registerCallbacks(bot);
-  console.log("✅ Telegram callbacks registered");
-} catch (error) {
-  console.error("❌ Failed to register callbacks:", error);
-}
-
-// =========================================================
-// REGISTER MESSAGE HANDLER
-// =========================================================
-
-try {
-  registerMessageHandler(bot);
-  console.log("✅ Telegram message handler registered");
-} catch (error) {
-  console.error("❌ Failed to register message handler:", error);
-}
-
-// =========================================================
-// POLLING ERROR
-// =========================================================
+console.log("✅ Telegram commands registered");
+console.log("✅ Telegram callbacks registered");
+console.log("✅ Telegram message handler registered");
 
 bot.on("polling_error", (error) => {
   console.error("🤖 Telegram polling error:", error.message);
 });
-
-// =========================================================
-// BOT ERROR
-// =========================================================
 
 bot.on("error", (error) => {
   console.error("🤖 Telegram bot error:", error);
