@@ -1,5 +1,9 @@
 import supabase from "../config/supabase.js";
 
+// =========================================================
+// CREATE WITHDRAWAL
+// =========================================================
+
 export const createWithdrawal = async ({
   userId,
   amount,
@@ -38,6 +42,7 @@ export const createWithdrawal = async ({
     return data;
   } catch (error) {
     console.error("🔥 createWithdrawal() FAILED");
+
     console.error("ERROR:", error);
     console.error("MESSAGE:", error?.message);
     console.error("DETAILS:", error?.details);
@@ -46,4 +51,63 @@ export const createWithdrawal = async ({
 
     throw error;
   }
+};
+
+// =========================================================
+// GET USER WITHDRAWALS
+// =========================================================
+
+export const getUserWithdrawals = async (userId) => {
+  const { data, error } = await supabase
+    .from("withdrawals")
+    .select(
+      `
+      id,
+      amount,
+      payment_method,
+      account_number,
+      status,
+      rejection_reason,
+      processed_at,
+      created_at
+    `,
+    )
+    .eq("user_id", userId)
+    .order("created_at", {
+      ascending: false,
+    });
+
+  if (error) {
+    console.error("❌ Failed to get user withdrawals:", error);
+
+    throw error;
+  }
+
+  return data || [];
+};
+
+// =========================================================
+// GET USER WITHDRAWAL BALANCE
+// =========================================================
+
+export const getUserWithdrawalBalance = async (userId) => {
+  console.log("💰 Getting withdrawal balance:", userId);
+
+  const { data, error } = await supabase
+    .from("wallets")
+    .select("balance")
+    .eq("user_id", userId)
+    .single();
+
+  if (error) {
+    console.error("❌ Failed to get wallet balance:", error);
+
+    throw error;
+  }
+
+  const balance = Number(data.balance);
+
+  console.log("💰 Current withdrawal balance:", balance);
+
+  return balance;
 };
