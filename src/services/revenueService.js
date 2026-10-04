@@ -1,26 +1,11 @@
 import supabase from "../config/supabase.js";
 
-/**
- * =========================================================
- * GET REVENUE
- * =========================================================
- *
- * Bets:
- *   booked slots × game.slot_price
- *
- * Prizes:
- *   actual prize_amount from winners table
- *
- * Platform Revenue:
- *   bets - prizes
- *
- * Only FINISHED games are included.
- */
-
 export const getRevenue = async () => {
-  // =======================================================
+  console.log("📊 Revenue: starting...");
+
+  // ============================================================
   // 1. GET FINISHED GAMES
-  // =======================================================
+  // ============================================================
 
   const { data: games, error: gamesError } = await supabase
     .from("games")
@@ -28,16 +13,27 @@ export const getRevenue = async () => {
     .eq("status", "FINISHED");
 
   if (gamesError) {
-    throw gamesError;
+    console.error("🔥 Revenue games query failed:", gamesError);
+
+    throw new Error(`Games query failed: ${gamesError.message}`);
   }
 
+  console.log(`📊 Revenue: found ${games?.length || 0} finished games`);
+
+  // ============================================================
+  // NO FINISHED GAMES
+  // ============================================================
+
   if (!games || games.length === 0) {
+    console.log("📊 Revenue: no finished games");
+
     return {
       today: {
         bets: 0,
         prizes: 0,
         revenue: 0,
       },
+
       allTime: {
         bets: 0,
         prizes: 0,
@@ -48,9 +44,11 @@ export const getRevenue = async () => {
 
   const gameIds = games.map((game) => game.id);
 
-  // =======================================================
+  console.log("📊 Revenue game IDs:", gameIds);
+
+  // ============================================================
   // 2. GET BOOKED SLOTS
-  // =======================================================
+  // ============================================================
 
   const { data: bookedSlots, error: slotsError } = await supabase
     .from("slots")
@@ -59,12 +57,16 @@ export const getRevenue = async () => {
     .eq("is_booked", true);
 
   if (slotsError) {
-    throw slotsError;
+    console.error("🔥 Revenue slots query failed:", slotsError);
+
+    throw new Error(`Slots query failed: ${slotsError.message}`);
   }
 
-  // =======================================================
+  console.log(`📊 Revenue: found ${bookedSlots?.length || 0} booked slots`);
+
+  // ============================================================
   // 3. GET WINNERS
-  // =======================================================
+  // ============================================================
 
   const { data: winners, error: winnersError } = await supabase
     .from("winners")
@@ -72,12 +74,16 @@ export const getRevenue = async () => {
     .in("game_id", gameIds);
 
   if (winnersError) {
-    throw winnersError;
+    console.error("🔥 Revenue winners query failed:", winnersError);
+
+    throw new Error(`Winners query failed: ${winnersError.message}`);
   }
 
-  // =======================================================
+  console.log(`📊 Revenue: found ${winners?.length || 0} winners`);
+
+  // ============================================================
   // 4. COUNT BOOKED SLOTS PER GAME
-  // =======================================================
+  // ============================================================
 
   const bookedCountByGame = new Map();
 
@@ -87,9 +93,9 @@ export const getRevenue = async () => {
     bookedCountByGame.set(slot.game_id, currentCount + 1);
   }
 
-  // =======================================================
-  // 5. SUM PRIZES PER GAME
-  // =======================================================
+  // ============================================================
+  // 5. TOTAL PRIZE PER GAME
+  // ============================================================
 
   const prizeByGame = new Map();
 
@@ -99,9 +105,9 @@ export const getRevenue = async () => {
     prizeByGame.set(winner.game_id, currentPrize + Number(winner.prize_amount));
   }
 
-  // =======================================================
-  // 6. START TOTALS
-  // =======================================================
+  // ============================================================
+  // 6. CALCULATE REVENUE
+  // ============================================================
 
   let todayBets = 0;
   let todayPrizes = 0;
@@ -109,10 +115,7 @@ export const getRevenue = async () => {
   let allTimeBets = 0;
   let allTimePrizes = 0;
 
-  // =======================================================
-  // 7. ETHIOPIA TODAY
-  // =======================================================
-
+  // Ethiopia = UTC+3
   const now = new Date();
 
   const ethiopiaOffsetMs = 3 * 60 * 60 * 1000;
@@ -123,9 +126,7 @@ export const getRevenue = async () => {
 
   const startOfTodayUTC = new Date(ethiopiaNow.getTime() - ethiopiaOffsetMs);
 
-  // =======================================================
-  // 8. CALCULATE
-  // =======================================================
+  console.log("📅 Revenue today starts:", startOfTodayUTC.toISOString());
 
   for (const game of games) {
     const soldSlots = bookedCountByGame.get(game.id) || 0;
@@ -134,11 +135,9 @@ export const getRevenue = async () => {
 
     const prizes = prizeByGame.get(game.id) || 0;
 
-    // All time
     allTimeBets += bets;
     allTimePrizes += prizes;
 
-    // Today
     const dateToUse = game.drawn_at || game.created_at;
 
     const gameDate = new Date(dateToUse);
@@ -147,13 +146,22 @@ export const getRevenue = async () => {
       todayBets += bets;
       todayPrizes += prizes;
     }
+
+    console.log("📊 Game revenue:", {
+      gameId: game.id,
+      slotPrice: game.slot_price,
+      soldSlots,
+      bets,
+      prizes,
+      date: dateToUse,
+    });
   }
 
-  // =======================================================
-  // 9. RETURN
-  // =======================================================
+  // ============================================================
+  // 7. FINAL RESULT
+  // ============================================================
 
-  return {
+  const result = {
     today: {
       bets: todayBets,
       prizes: todayPrizes,
@@ -166,4 +174,8 @@ export const getRevenue = async () => {
       revenue: allTimeBets - allTimePrizes,
     },
   };
+
+  console.log("✅ Revenue calculation complete:", result);
+
+  return result;
 };
