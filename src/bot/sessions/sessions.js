@@ -1,4 +1,6 @@
-const depositSessions = new Map();
-const adminSessions = new Map();
+export const depositSessions = new Map();
 
-export { depositSessions, adminSessions };
+export const withdrawalSessions = new Map();
+
+export const adminSessions = new Map();
+export { depositSessions, withdrawalSessions, adminSessions };
