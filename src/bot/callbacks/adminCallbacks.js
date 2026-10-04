@@ -1,9 +1,4 @@
-import {
-  getTelebirrSettings,
-  updateTelebirrPhone,
-  updateTelebirrAccountName,
-} from "../../services/paymentSettingsService.js";
-
+import { getTelebirrSettings } from "../../services/paymentSettingsService.js";
 import { getRevenue } from "../../services/revenueService.js";
 
 import { isAdmin } from "../utils/auth.js";
@@ -16,56 +11,68 @@ import {
 
 export const registerAdminCallbacks = (bot, adminSessions) => {
   bot.on("callback_query", async (query) => {
-    try {
-      if (!query.message) {
-        return;
-      }
+    if (!query.message) {
+      return;
+    }
 
-      const action = query.data;
-      const chatId = query.message.chat.id;
-      const telegramId = query.from?.id;
+    const action = query.data;
+    const chatId = query.message.chat.id;
+    const telegramId = query.from?.id;
 
-      // ======================================================
-      // ONLY HANDLE ADMIN CALLBACKS
-      // ======================================================
+    const adminActions = [
+      "admin_payment_settings",
+      "admin_change_phone",
+      "admin_change_name",
+      "admin_revenue",
+      "admin_withdrawals",
+      "admin_announcements",
+      "admin_back",
+    ];
 
-      const adminActions = [
-        "admin_payment_settings",
-        "admin_change_phone",
-        "admin_change_name",
-        "admin_revenue",
-        "admin_withdrawals",
-        "admin_announcements",
-        "admin_back",
-      ];
+    if (!adminActions.includes(action)) {
+      return;
+    }
 
-      if (!adminActions.includes(action)) {
-        return;
-      }
+    // ============================================================
+    // ADMIN AUTH CHECK
+    // ============================================================
 
-      // ======================================================
-      // ADMIN AUTHENTICATION
-      // ======================================================
-
-      if (!telegramId || !isAdmin(telegramId)) {
+    if (!telegramId || !isAdmin(telegramId)) {
+      try {
         await bot.answerCallbackQuery(query.id, {
           text: "❌ Unauthorized",
           show_alert: true,
         });
-
-        console.log("🚫 Unauthorized admin callback:", {
-          telegramId,
-          action,
-        });
-
-        return;
+      } catch (error) {
+        console.error("❌ Failed to answer unauthorized callback:", error);
       }
 
-      await bot.answerCallbackQuery(query.id);
+      console.log("🚫 Unauthorized admin callback:", {
+        telegramId,
+        action,
+      });
 
-      // ======================================================
+      return;
+    }
+
+    // ============================================================
+    // ANSWER CALLBACK ONCE
+    // ============================================================
+
+    try {
+      await bot.answerCallbackQuery(query.id);
+    } catch (error) {
+      console.error("❌ Failed to answer callback:", error);
+    }
+
+    // ============================================================
+    // HANDLE ADMIN ACTION
+    // ============================================================
+
+    try {
+      // ----------------------------------------------------------
       // PAYMENT SETTINGS
-      // ======================================================
+      // ----------------------------------------------------------
 
       if (action === "admin_payment_settings") {
         const settings = await getTelebirrSettings();
@@ -75,9 +82,9 @@ export const registerAdminCallbacks = (bot, adminSessions) => {
         return;
       }
 
-      // ======================================================
-      // CHANGE PHONE
-      // ======================================================
+      // ----------------------------------------------------------
+      // CHANGE TELEBIRR PHONE
+      // ----------------------------------------------------------
 
       if (action === "admin_change_phone") {
         adminSessions.set(chatId, {
@@ -100,9 +107,9 @@ Send /cancel to cancel.`,
         return;
       }
 
-      // ======================================================
-      // CHANGE ACCOUNT NAME
-      // ======================================================
+      // ----------------------------------------------------------
+      // CHANGE TELEBIRR NAME
+      // ----------------------------------------------------------
 
       if (action === "admin_change_name") {
         adminSessions.set(chatId, {
@@ -121,21 +128,27 @@ Send /cancel to cancel.`,
         return;
       }
 
-      // ======================================================
+      // ----------------------------------------------------------
       // REVENUE
-      // ======================================================
+      // ----------------------------------------------------------
 
       if (action === "admin_revenue") {
+        console.log("📊 Loading admin revenue...");
+
         const revenue = await getRevenue();
 
+        console.log("📊 Revenue result:", revenue);
+
         await sendAdminRevenue(bot, chatId, revenue);
+
+        console.log("✅ Revenue sent to admin");
 
         return;
       }
 
-      // ======================================================
+      // ----------------------------------------------------------
       // WITHDRAWALS
-      // ======================================================
+      // ----------------------------------------------------------
 
       if (action === "admin_withdrawals") {
         await bot.sendMessage(
@@ -148,9 +161,9 @@ Withdrawal management will be added next.`,
         return;
       }
 
-      // ======================================================
+      // ----------------------------------------------------------
       // ANNOUNCEMENTS
-      // ======================================================
+      // ----------------------------------------------------------
 
       if (action === "admin_announcements") {
         await bot.sendMessage(
@@ -163,9 +176,9 @@ Announcement management will be added next.`,
         return;
       }
 
-      // ======================================================
+      // ----------------------------------------------------------
       // BACK
-      // ======================================================
+      // ----------------------------------------------------------
 
       if (action === "admin_back") {
         adminSessions.delete(chatId);
@@ -175,15 +188,24 @@ Announcement management will be added next.`,
         return;
       }
     } catch (error) {
-      console.error("❌ Admin callback error:", error);
+      // IMPORTANT:
+      // Do NOT call answerCallbackQuery here again.
+      // The callback was already answered above.
+
+      console.error("❌ Admin callback action failed:", {
+        action,
+        telegramId,
+        chatId,
+        error,
+      });
 
       try {
-        await bot.answerCallbackQuery(query.id, {
-          text: "❌ Something went wrong",
-          show_alert: true,
-        });
-      } catch (callbackError) {
-        console.error("❌ Failed to answer admin callback:", callbackError);
+        await bot.sendMessage(
+          chatId,
+          "❌ Something went wrong. Please try again.",
+        );
+      } catch (sendError) {
+        console.error("❌ Failed to send admin error message:", sendError);
       }
     }
   });
