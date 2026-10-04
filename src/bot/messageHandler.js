@@ -441,7 +441,7 @@ Example:
           // MINIMUM WITHDRAWAL
           // -----------------------------------------------------
 
-          const MIN_WITHDRAWAL = 1;
+          const MIN_WITHDRAWAL = 5;
 
           if (amount < MIN_WITHDRAWAL) {
             await bot.sendMessage(
