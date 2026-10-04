@@ -1,14 +1,18 @@
-// bot/callbacks/adminCallbacks.js
-
 import {
   getTelebirrSettings,
   updateTelebirrPhone,
   updateTelebirrAccountName,
 } from "../../services/paymentSettingsService.js";
 
+import { getRevenue } from "../../services/revenueService.js";
+
 import { isAdmin } from "../utils/auth.js";
 
-import { sendAdminMenu, sendAdminPaymentSettings } from "../menus/adminMenu.js";
+import {
+  sendAdminMenu,
+  sendAdminPaymentSettings,
+  sendAdminRevenue,
+} from "../menus/adminMenu.js";
 
 export const registerAdminCallbacks = (bot, adminSessions) => {
   bot.on("callback_query", async (query) => {
@@ -31,6 +35,7 @@ export const registerAdminCallbacks = (bot, adminSessions) => {
         "admin_change_name",
         "admin_revenue",
         "admin_withdrawals",
+        "admin_announcements",
         "admin_back",
       ];
 
@@ -117,28 +122,13 @@ Send /cancel to cancel.`,
       }
 
       // ======================================================
-      // BACK
-      // ======================================================
-
-      if (action === "admin_back") {
-        adminSessions.delete(chatId);
-
-        await sendAdminMenu(bot, chatId);
-
-        return;
-      }
-
-      // ======================================================
       // REVENUE
       // ======================================================
 
       if (action === "admin_revenue") {
-        await bot.sendMessage(
-          chatId,
-          `📊 Revenue
+        const revenue = await getRevenue();
 
-Revenue dashboard will be added next.`,
-        );
+        await sendAdminRevenue(bot, chatId, revenue);
 
         return;
       }
@@ -157,8 +147,44 @@ Withdrawal management will be added next.`,
 
         return;
       }
+
+      // ======================================================
+      // ANNOUNCEMENTS
+      // ======================================================
+
+      if (action === "admin_announcements") {
+        await bot.sendMessage(
+          chatId,
+          `📢 Announcements
+
+Announcement management will be added next.`,
+        );
+
+        return;
+      }
+
+      // ======================================================
+      // BACK
+      // ======================================================
+
+      if (action === "admin_back") {
+        adminSessions.delete(chatId);
+
+        await sendAdminMenu(bot, chatId);
+
+        return;
+      }
     } catch (error) {
       console.error("❌ Admin callback error:", error);
+
+      try {
+        await bot.answerCallbackQuery(query.id, {
+          text: "❌ Something went wrong",
+          show_alert: true,
+        });
+      } catch (callbackError) {
+        console.error("❌ Failed to answer admin callback:", callbackError);
+      }
     }
   });
 };
