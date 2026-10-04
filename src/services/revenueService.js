@@ -14,26 +14,18 @@ export const getRevenue = async () => {
 
   if (gamesError) {
     console.error("🔥 Revenue games query failed:", gamesError);
-
     throw new Error(`Games query failed: ${gamesError.message}`);
   }
 
   console.log(`📊 Revenue: found ${games?.length || 0} finished games`);
 
-  // ============================================================
-  // NO FINISHED GAMES
-  // ============================================================
-
   if (!games || games.length === 0) {
-    console.log("📊 Revenue: no finished games");
-
     return {
       today: {
         bets: 0,
         prizes: 0,
         revenue: 0,
       },
-
       allTime: {
         bets: 0,
         prizes: 0,
@@ -42,18 +34,22 @@ export const getRevenue = async () => {
     };
   }
 
-  const gameIds = games.map((game) => game.id);
+  // ============================================================
+  // CREATE SET OF FINISHED GAME IDS
+  // ============================================================
 
-  console.log("📊 Revenue game IDs:", gameIds);
+  const finishedGameIds = new Set(games.map((game) => game.id));
 
   // ============================================================
   // 2. GET BOOKED SLOTS
   // ============================================================
+  // We intentionally do NOT use .in("game_id", gameIds).
+  // This avoids Supabase/PostgREST request problems when
+  // there are many games.
 
   const { data: bookedSlots, error: slotsError } = await supabase
     .from("slots")
     .select("game_id")
-    .in("game_id", gameIds)
     .eq("is_booked", true);
 
   if (slotsError) {
@@ -70,8 +66,11 @@ export const getRevenue = async () => {
 
   const { data: winners, error: winnersError } = await supabase
     .from("winners")
-    .select("game_id, prize_amount, created_at")
-    .in("game_id", gameIds);
+    .select("game_id, prize_amount")
+    .in(
+      "game_id",
+      games.map((game) => game.id),
+    );
 
   if (winnersError) {
     console.error("🔥 Revenue winners query failed:", winnersError);
@@ -82,12 +81,17 @@ export const getRevenue = async () => {
   console.log(`📊 Revenue: found ${winners?.length || 0} winners`);
 
   // ============================================================
-  // 4. COUNT BOOKED SLOTS PER GAME
+  // 4. COUNT BOOKED SLOTS PER FINISHED GAME
   // ============================================================
 
   const bookedCountByGame = new Map();
 
   for (const slot of bookedSlots || []) {
+    // Ignore slots belonging to unfinished games
+    if (!finishedGameIds.has(slot.game_id)) {
+      continue;
+    }
+
     const currentCount = bookedCountByGame.get(slot.game_id) || 0;
 
     bookedCountByGame.set(slot.game_id, currentCount + 1);
@@ -106,18 +110,12 @@ export const getRevenue = async () => {
   }
 
   // ============================================================
-  // 6. CALCULATE REVENUE
+  // 6. ETHIOPIA TODAY
   // ============================================================
 
-  let todayBets = 0;
-  let todayPrizes = 0;
-
-  let allTimeBets = 0;
-  let allTimePrizes = 0;
-
-  // Ethiopia = UTC+3
   const now = new Date();
 
+  // Ethiopia = UTC+3
   const ethiopiaOffsetMs = 3 * 60 * 60 * 1000;
 
   const ethiopiaNow = new Date(now.getTime() + ethiopiaOffsetMs);
@@ -126,7 +124,17 @@ export const getRevenue = async () => {
 
   const startOfTodayUTC = new Date(ethiopiaNow.getTime() - ethiopiaOffsetMs);
 
-  console.log("📅 Revenue today starts:", startOfTodayUTC.toISOString());
+  console.log("📅 Today starts:", startOfTodayUTC.toISOString());
+
+  // ============================================================
+  // 7. CALCULATE REVENUE
+  // ============================================================
+
+  let todayBets = 0;
+  let todayPrizes = 0;
+
+  let allTimeBets = 0;
+  let allTimePrizes = 0;
 
   for (const game of games) {
     const soldSlots = bookedCountByGame.get(game.id) || 0;
@@ -147,10 +155,10 @@ export const getRevenue = async () => {
       todayPrizes += prizes;
     }
 
-    console.log("📊 Game revenue:", {
-      gameId: game.id,
-      slotPrice: game.slot_price,
+    console.log("📊 Game:", {
+      id: game.id,
       soldSlots,
+      slotPrice: game.slot_price,
       bets,
       prizes,
       date: dateToUse,
@@ -158,7 +166,7 @@ export const getRevenue = async () => {
   }
 
   // ============================================================
-  // 7. FINAL RESULT
+  // 8. FINAL RESULT
   // ============================================================
 
   const result = {
