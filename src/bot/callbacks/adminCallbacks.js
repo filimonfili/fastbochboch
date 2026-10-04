@@ -27,7 +27,7 @@ import {
 } from "../menus/adminMenu.js";
 
 import { adminSessions } from "../sessions/sessions.js";
-
+import { getAllPlayers } from "../../services/announcementService.js";
 export const registerAdminCallbacks = (bot) => {
   bot.on("callback_query", async (query) => {
     if (!query.message) {
@@ -492,3 +492,134 @@ Please try again.`,
     }
   });
 };
+// ========================================================
+// CREATE ANNOUNCEMENT
+// ========================================================
+
+if (action === "admin_create_announcement") {
+  adminSessions.set(chatId, {
+    action: "CREATE_ANNOUNCEMENT",
+  });
+
+  await bot.sendMessage(
+    chatId,
+    `📢 Create Announcement
+
+Send the message you want to broadcast to all players.
+
+You can use text and emojis.
+
+Send /cancel to cancel.`,
+  );
+
+  return;
+}
+// ========================================================
+// SEND ANNOUNCEMENT
+// ========================================================
+
+if (action === "admin_send_announcement") {
+  const session = adminSessions.get(chatId);
+
+  if (
+    !session ||
+    session.action !== "CONFIRM_ANNOUNCEMENT" ||
+    !session.announcement
+  ) {
+    adminSessions.delete(chatId);
+
+    await bot.sendMessage(
+      chatId,
+      `⚠️ Announcement session expired.
+
+Please create the announcement again.`,
+    );
+
+    return;
+  }
+
+  const announcement = session.announcement;
+
+  adminSessions.delete(chatId);
+
+  await bot.sendMessage(
+    chatId,
+    `📢 Sending announcement...
+
+Please wait.`,
+  );
+
+  let players;
+
+  try {
+    players = await getAllPlayers();
+  } catch (error) {
+    console.error("❌ Failed to load players:", error);
+
+    await bot.sendMessage(
+      chatId,
+      `❌ Failed to load players.
+
+The announcement was not sent.`,
+    );
+
+    return;
+  }
+
+  let sent = 0;
+  let failed = 0;
+
+  for (const player of players) {
+    if (!player.telegram_id) {
+      continue;
+    }
+
+    try {
+      await bot.sendMessage(
+        player.telegram_id,
+        `📢 Fast Boch Boch Announcement
+
+${announcement}`,
+      );
+
+      sent++;
+
+      // Small delay to reduce Telegram rate-limit risk
+      await new Promise((resolve) => setTimeout(resolve, 50));
+    } catch (error) {
+      failed++;
+
+      console.error(
+        `❌ Failed to send announcement to ${player.telegram_id}:`,
+        error.message,
+      );
+    }
+  }
+
+  await bot.sendMessage(
+    chatId,
+    `✅ Announcement Finished
+
+👥 Total Players:
+${players.length}
+
+✅ Successfully Sent:
+${sent}
+
+❌ Failed:
+${failed}`,
+  );
+
+  return;
+}
+// ========================================================
+// CANCEL ANNOUNCEMENT
+// ========================================================
+
+if (action === "admin_cancel_announcement") {
+  adminSessions.delete(chatId);
+
+  await bot.sendMessage(chatId, "❌ Announcement cancelled.");
+
+  return;
+}

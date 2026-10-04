@@ -5,7 +5,7 @@ import {
   withdrawalSessions,
   adminSessions,
 } from "./sessions/sessions.js";
-
+import { getAllPlayers } from "../services/announcementService.js";
 import {
   updateTelebirrPhone,
   updateTelebirrAccountName,
@@ -291,7 +291,73 @@ It cannot be rejected again.`,
 
                 return;
               }
+              // ========================================================
+              // CREATE ANNOUNCEMENT
+              // ========================================================
 
+              if (adminSession.action === "CREATE_ANNOUNCEMENT") {
+                const announcement = text.trim();
+
+                if (!announcement) {
+                  await bot.sendMessage(
+                    chatId,
+                    `❌ Announcement cannot be empty.
+
+Please send the announcement text.`,
+                  );
+
+                  return;
+                }
+
+                if (announcement.length > 4000) {
+                  await bot.sendMessage(
+                    chatId,
+                    `❌ Announcement is too long.
+
+Please keep it under 4000 characters.`,
+                  );
+
+                  return;
+                }
+
+                adminSessions.set(chatId, {
+                  action: "CONFIRM_ANNOUNCEMENT",
+                  announcement,
+                });
+
+                await bot.sendMessage(
+                  chatId,
+                  `📢 Announcement Preview
+
+━━━━━━━━━━━━━━━
+
+${announcement}
+
+━━━━━━━━━━━━━━━
+
+Send this announcement to all players?`,
+                  {
+                    reply_markup: {
+                      inline_keyboard: [
+                        [
+                          {
+                            text: "✅ Send to All Players",
+                            callback_data: "admin_send_announcement",
+                          },
+                        ],
+                        [
+                          {
+                            text: "❌ Cancel",
+                            callback_data: "admin_cancel_announcement",
+                          },
+                        ],
+                      ],
+                    },
+                  },
+                );
+
+                return;
+              }
               // -----------------------------------------------
               // NOT FOUND
               // -----------------------------------------------

@@ -324,10 +324,18 @@ export const sendAdminAnnouncements = async (bot, chatId) => {
     chatId,
     `📢 Announcements
 
-Announcement management will be available here.`,
+Send a message to all Fast Boch Boch players.
+
+Choose an option below 👇`,
     {
       reply_markup: {
         inline_keyboard: [
+          [
+            {
+              text: "✏️ Create Announcement",
+              callback_data: "admin_create_announcement",
+            },
+          ],
           [
             {
               text: "⬅️ Back",
