@@ -203,27 +203,12 @@ If you have a problem with your account, deposit, withdrawal, or game, please co
       // =========================================================
       // WITHDRAWAL SESSION
       // =========================================================
-      //
-      // We handle withdrawal text input here.
-      //
-      // The actual flow will be:
-      //
-      // PAYMENT_METHOD
-      //       ↓
-      // AMOUNT
-      //       ↓
-      // ACCOUNT_NUMBER
-      //       ↓
-      // CONFIRMATION
-      //
-      // For now, only continue if a withdrawal session exists.
-      // =========================================================
 
       const withdrawalSession = withdrawalSessions.get(chatId);
 
       if (withdrawalSession) {
         // -------------------------------------------------------
-        // CANCEL WITHDRAWAL
+        // CANCEL
         // -------------------------------------------------------
 
         if (text === "/cancel") {
@@ -234,16 +219,197 @@ If you have a problem with your account, deposit, withdrawal, or game, please co
           return;
         }
 
-        // -------------------------------------------------------
-        // AMOUNT / ACCOUNT INPUT
-        // -------------------------------------------------------
-        //
-        // The detailed withdrawal steps will be handled here
-        // in the next step.
-        //
-        // Do not allow this message to fall through into the
-        // deposit handler.
-        // -------------------------------------------------------
+        // =======================================================
+        // ENTER WITHDRAWAL AMOUNT
+        // =======================================================
+
+        if (withdrawalSession.step === "AMOUNT") {
+          const amount = Number(text);
+
+          // -----------------------------------------------------
+          // INVALID NUMBER
+          // -----------------------------------------------------
+
+          if (!Number.isInteger(amount) || amount <= 0) {
+            await bot.sendMessage(
+              chatId,
+              `❌ Invalid amount.
+
+Please enter a valid whole number.
+
+Example:
+
+100`,
+            );
+
+            return;
+          }
+
+          // -----------------------------------------------------
+          // MINIMUM WITHDRAWAL
+          // -----------------------------------------------------
+
+          const MIN_WITHDRAWAL = 50;
+
+          if (amount < MIN_WITHDRAWAL) {
+            await bot.sendMessage(
+              chatId,
+              `❌ Minimum withdrawal is ${MIN_WITHDRAWAL} ETB.
+
+Please enter an amount of ${MIN_WITHDRAWAL} ETB or more.`,
+            );
+
+            return;
+          }
+
+          // -----------------------------------------------------
+          // CHECK CURRENT BALANCE AGAIN
+          // -----------------------------------------------------
+
+          const currentBalance = withdrawalSession.balance;
+
+          // -----------------------------------------------------
+          // INSUFFICIENT BALANCE
+          // -----------------------------------------------------
+
+          if (amount > currentBalance) {
+            await bot.sendMessage(
+              chatId,
+              `❌ Insufficient Balance
+
+Your balance:
+${currentBalance} ETB
+
+Requested:
+${amount} ETB
+
+Please enter an amount up to ${currentBalance} ETB.`,
+            );
+
+            return;
+          }
+
+          // -----------------------------------------------------
+          // SAVE AMOUNT
+          // -----------------------------------------------------
+
+          withdrawalSessions.set(chatId, {
+            ...withdrawalSession,
+            amount,
+            step: "ACCOUNT_NUMBER",
+          });
+
+          // -----------------------------------------------------
+          // ASK FOR ACCOUNT NUMBER
+          // -----------------------------------------------------
+
+          const paymentName =
+            withdrawalSession.paymentMethod === "TELEBIRR"
+              ? "Telebirr"
+              : "CBE Birr";
+
+          await bot.sendMessage(
+            chatId,
+            `📱 ${paymentName} Withdrawal
+
+💰 Amount:
+${amount} ETB
+
+Now enter the ${paymentName} phone number where you want to receive the money.
+
+Example:
+
+0912345678
+
+Send /cancel to cancel.`,
+          );
+
+          return;
+        }
+
+        // =======================================================
+        // ENTER ACCOUNT NUMBER
+        // =======================================================
+
+        if (withdrawalSession.step === "ACCOUNT_NUMBER") {
+          const accountNumber = text.replace(/\s+/g, "");
+
+          // -----------------------------------------------------
+          // VALIDATE ETHIOPIAN PHONE
+          // -----------------------------------------------------
+
+          if (!/^09\d{8}$/.test(accountNumber)) {
+            await bot.sendMessage(
+              chatId,
+              `❌ Invalid phone number.
+
+Please enter a valid Ethiopian mobile number.
+
+Example:
+
+0912345678`,
+            );
+
+            return;
+          }
+
+          // -----------------------------------------------------
+          // SAVE ACCOUNT NUMBER
+          // -----------------------------------------------------
+
+          withdrawalSessions.set(chatId, {
+            ...withdrawalSession,
+            accountNumber,
+            step: "CONFIRM",
+          });
+
+          const paymentName =
+            withdrawalSession.paymentMethod === "TELEBIRR"
+              ? "Telebirr"
+              : "CBE Birr";
+
+          // -----------------------------------------------------
+          // CONFIRMATION
+          // -----------------------------------------------------
+
+          await bot.sendMessage(
+            chatId,
+            `🔎 Confirm Withdrawal
+
+💰 Amount:
+${withdrawalSession.amount} ETB
+
+📱 Method:
+${paymentName}
+
+📞 Number:
+${accountNumber}
+
+Please check the information carefully.
+
+Do you want to continue?`,
+            {
+              reply_markup: {
+                inline_keyboard: [
+                  [
+                    {
+                      text: "✅ Confirm Withdrawal",
+                      callback_data: "withdraw_confirm",
+                    },
+                  ],
+                  [
+                    {
+                      text: "❌ Cancel",
+                      callback_data: "withdraw_cancel",
+                    },
+                  ],
+                ],
+              },
+            },
+          );
+
+          return;
+        }
 
         return;
       }
