@@ -1,9 +1,12 @@
 import { isAdmin } from "./utils/auth.js";
 
-import { depositSessions, adminSessions } from "./sessions/sessions.js";
+import {
+  depositSessions,
+  withdrawalSessions,
+  adminSessions,
+} from "./sessions/sessions.js";
 
 import {
-  getTelebirrSettings,
   updateTelebirrPhone,
   updateTelebirrAccountName,
 } from "../services/paymentSettingsService.js";
@@ -15,6 +18,8 @@ import { sendMainMenu } from "./menus/mainMenu.js";
 import { sendPaymentMethods } from "./menus/depositMenu.js";
 
 import { sendAdminMenu } from "./menus/adminMenu.js";
+
+import { startWithdrawal } from "./commands/withdraw.js";
 
 export const registerMessageHandler = (bot) => {
   bot.on("message", async (msg) => {
@@ -33,13 +38,17 @@ export const registerMessageHandler = (bot) => {
         const adminSession = adminSessions.get(chatId);
 
         if (adminSession) {
-          // Cancel current admin action
+          // -----------------------------------------------------
+          // CANCEL ADMIN ACTION
+          // -----------------------------------------------------
+
           if (text === "/cancel") {
             adminSessions.delete(chatId);
 
             await bot.sendMessage(chatId, "❌ Admin action cancelled.");
 
             await sendAdminMenu(bot, chatId);
+
             return;
           }
 
@@ -142,6 +151,10 @@ ${settings.account_name}`,
         return;
       }
 
+      // ---------------------------------------------------------
+      // BALANCE
+      // ---------------------------------------------------------
+
       if (text === "💰 Balance") {
         await bot.sendMessage(
           chatId,
@@ -153,21 +166,28 @@ Your wallet balance is available inside Boch Boch.`,
         return;
       }
 
+      // ---------------------------------------------------------
+      // DEPOSIT
+      // ---------------------------------------------------------
+
       if (text === "➕ Deposit") {
         await sendPaymentMethods(bot, chatId);
+
         return;
       }
+
+      // ---------------------------------------------------------
+      // WITHDRAW
+      // ---------------------------------------------------------
 
       if (text === "💸 Withdraw") {
-        await bot.sendMessage(
-          chatId,
-          `💸 Withdraw
-
-Withdrawal options will be available here.`,
-        );
-
+        await startWithdrawal(bot, msg);
         return;
       }
+
+      // ---------------------------------------------------------
+      // SUPPORT
+      // ---------------------------------------------------------
 
       if (text === "🆘 Support") {
         await bot.sendMessage(
@@ -176,6 +196,54 @@ Withdrawal options will be available here.`,
 
 If you have a problem with your account, deposit, withdrawal, or game, please contact support.`,
         );
+
+        return;
+      }
+
+      // =========================================================
+      // WITHDRAWAL SESSION
+      // =========================================================
+      //
+      // We handle withdrawal text input here.
+      //
+      // The actual flow will be:
+      //
+      // PAYMENT_METHOD
+      //       ↓
+      // AMOUNT
+      //       ↓
+      // ACCOUNT_NUMBER
+      //       ↓
+      // CONFIRMATION
+      //
+      // For now, only continue if a withdrawal session exists.
+      // =========================================================
+
+      const withdrawalSession = withdrawalSessions.get(chatId);
+
+      if (withdrawalSession) {
+        // -------------------------------------------------------
+        // CANCEL WITHDRAWAL
+        // -------------------------------------------------------
+
+        if (text === "/cancel") {
+          withdrawalSessions.delete(chatId);
+
+          await bot.sendMessage(chatId, "❌ Withdrawal cancelled.");
+
+          return;
+        }
+
+        // -------------------------------------------------------
+        // AMOUNT / ACCOUNT INPUT
+        // -------------------------------------------------------
+        //
+        // The detailed withdrawal steps will be handled here
+        // in the next step.
+        //
+        // Do not allow this message to fall through into the
+        // deposit handler.
+        // -------------------------------------------------------
 
         return;
       }
@@ -190,6 +258,10 @@ If you have a problem with your account, deposit, withdrawal, or game, please co
         return;
       }
 
+      // ---------------------------------------------------------
+      // CANCEL DEPOSIT
+      // ---------------------------------------------------------
+
       if (text === "/cancel") {
         depositSessions.delete(chatId);
 
@@ -200,7 +272,10 @@ If you have a problem with your account, deposit, withdrawal, or game, please co
         return;
       }
 
-      // Only process deposit input for Telebirr
+      // ---------------------------------------------------------
+      // ONLY PROCESS TELEBIRR DEPOSIT
+      // ---------------------------------------------------------
+
       if (depositSession.paymentMethod !== "TELEBIRR") {
         return;
       }
