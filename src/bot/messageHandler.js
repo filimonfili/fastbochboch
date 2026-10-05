@@ -46,6 +46,13 @@ export const registerMessageHandler = (bot) => {
 
       if (telegramId && isAdmin(telegramId)) {
         const adminSession = adminSessions.get(chatId);
+        console.log("🔎 ADMIN SESSION:", {
+          chatId,
+          telegramId,
+          isAdmin: isAdmin(telegramId),
+          adminSession,
+          hasPhoto: Boolean(msg.photo),
+        });
 
         if (adminSession) {
           // -----------------------------------------------------
