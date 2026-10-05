@@ -2,11 +2,7 @@ import supabase from "../../config/supabase.js";
 
 import { isAdmin } from "../utils/auth.js";
 
-import {
-  getTelebirrSettings,
-  updateTelebirrPhone,
-  updateTelebirrAccountName,
-} from "../../services/paymentSettingsService.js";
+import { getTelebirrSettings } from "../../services/paymentSettingsService.js";
 
 import { getRevenue } from "../../services/revenueService.js";
 
@@ -15,8 +11,6 @@ import {
   getRecentWithdrawals,
   approveWithdrawal,
 } from "../../services/adminWithdrawalService.js";
-
-import { getAllPlayers } from "../../services/announcementService.js";
 
 import {
   sendAdminMenu,
@@ -53,9 +47,6 @@ export const registerAdminCallbacks = (bot) => {
       action === "admin_pending_withdrawals" ||
       action === "admin_recent_withdrawals" ||
       action === "admin_announcements" ||
-      action === "admin_create_announcement" ||
-      action === "admin_send_announcement" ||
-      action === "admin_cancel_announcement" ||
       action === "admin_back" ||
       action?.startsWith("admin_approve_withdrawal:") ||
       action?.startsWith("admin_reject_withdrawal:");
@@ -412,7 +403,7 @@ It cannot be approved again.`,
           }
 
           if (message.includes("WITHDRAWAL_NOT_FOUND")) {
-            await bot.sendMessage(chatId, `❌ Withdrawal not found.`);
+            await bot.sendMessage(chatId, "❌ Withdrawal not found.");
 
             return;
           }
@@ -474,141 +465,6 @@ Send /cancel to cancel.`,
 
       if (action === "admin_announcements") {
         await sendAdminAnnouncements(bot, chatId);
-
-        return;
-      }
-
-      // ===================================================
-      // CREATE ANNOUNCEMENT
-      // ===================================================
-
-      if (action === "admin_create_announcement") {
-        adminSessions.set(chatId, {
-          action: "CREATE_ANNOUNCEMENT",
-        });
-
-        await bot.sendMessage(
-          chatId,
-          `📢 Create Announcement
-
-Send the message you want to broadcast to all players.
-
-You can use text and emojis.
-
-Send /cancel to cancel.`,
-        );
-
-        return;
-      }
-
-      // ===================================================
-      // SEND ANNOUNCEMENT
-      // ===================================================
-
-      if (action === "admin_send_announcement") {
-        const session = adminSessions.get(chatId);
-
-        if (
-          !session ||
-          session.action !== "CONFIRM_ANNOUNCEMENT" ||
-          !session.announcement
-        ) {
-          adminSessions.delete(chatId);
-
-          await bot.sendMessage(
-            chatId,
-            `⚠️ Announcement session expired.
-
-Please create the announcement again.`,
-          );
-
-          return;
-        }
-
-        const announcement = session.announcement;
-
-        adminSessions.delete(chatId);
-
-        await bot.sendMessage(
-          chatId,
-          `📢 Sending announcement...
-
-Please wait.`,
-        );
-
-        let players;
-
-        try {
-          players = await getAllPlayers();
-        } catch (error) {
-          console.error("❌ Failed to load players:", error);
-
-          await bot.sendMessage(
-            chatId,
-            `❌ Failed to load players.
-
-The announcement was not sent.`,
-          );
-
-          return;
-        }
-
-        let sent = 0;
-        let failed = 0;
-
-        for (const player of players) {
-          if (!player.telegram_id) {
-            continue;
-          }
-
-          try {
-            await bot.sendMessage(
-              player.telegram_id,
-              `📢 Fast Boch Boch Announcement
-
-${announcement}`,
-            );
-
-            sent++;
-
-            // Small delay to reduce
-            // Telegram rate-limit risk.
-            await new Promise((resolve) => setTimeout(resolve, 50));
-          } catch (error) {
-            failed++;
-
-            console.error(
-              `❌ Failed to send announcement to ${player.telegram_id}:`,
-              error.message,
-            );
-          }
-        }
-
-        await bot.sendMessage(
-          chatId,
-          `✅ Announcement Finished
-
-👥 Total Players:
-${players.length}
-
-✅ Successfully Sent:
-${sent}
-
-❌ Failed:
-${failed}`,
-        );
-
-        return;
-      }
-
-      // ===================================================
-      // CANCEL ANNOUNCEMENT
-      // ===================================================
-
-      if (action === "admin_cancel_announcement") {
-        adminSessions.delete(chatId);
-
-        await bot.sendMessage(chatId, "❌ Announcement cancelled.");
 
         return;
       }
