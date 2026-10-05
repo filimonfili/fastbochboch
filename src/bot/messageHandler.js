@@ -60,6 +60,12 @@ export const registerMessageHandler = (bot) => {
           // =====================================================
 
           if (adminSession.action === "WAITING_FOR_ANNOUNCEMENT_BANNER") {
+            console.log("📢 ANNOUNCEMENT BANNER RECEIVED", {
+              chatId,
+              telegramId,
+              hasPhoto: Boolean(msg.photo),
+              photoCount: msg.photo?.length || 0,
+            });
             if (!msg.photo || msg.photo.length === 0) {
               await bot.sendMessage(
                 chatId,
@@ -105,6 +111,11 @@ Send /cancel to cancel.`,
           // =====================================================
 
           if (adminSession.action === "WAITING_FOR_ANNOUNCEMENT_TEXT") {
+            console.log("📢 ANNOUNCEMENT TEXT RECEIVED", {
+              chatId,
+              telegramId,
+              textLength: text.length,
+            });
             if (!text) {
               await bot.sendMessage(
                 chatId,
@@ -149,7 +160,11 @@ Please create the announcement again.`,
               bannerFileId: adminSession.bannerFileId,
               announcement,
             });
-
+            console.log("📢 ANNOUNCEMENT PREVIEW READY", {
+              chatId,
+              bannerFileId: adminSession.bannerFileId,
+              textLength: announcement.length,
+            });
             // ---------------------------------------------------
             // SEND PREVIEW
             // ---------------------------------------------------
