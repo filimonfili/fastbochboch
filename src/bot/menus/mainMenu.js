@@ -1,6 +1,7 @@
 import supabase from "../../config/supabase.js";
+
 const miniAppUrl = process.env.TELEGRAM_MINI_APP_URL;
-import { getPlayerBalance } from "../../services/balanceService.js";
+
 // ============================================================
 // MAIN PLAYER MENU
 // ============================================================
@@ -8,14 +9,6 @@ import { getPlayerBalance } from "../../services/balanceService.js";
 export const sendMainMenu = async (bot, chatId) => {
   const mainMenuKeyboard = {
     keyboard: [
-      [
-        {
-          text: "🎮 Play Boch Boch",
-          web_app: {
-            url: miniAppUrl,
-          },
-        },
-      ],
       [
         {
           text: "💰 Balance",
@@ -41,7 +34,9 @@ export const sendMainMenu = async (bot, chatId) => {
     chatId,
     `🤖 Fast Boch Boch
 
-Welcome! Choose an option below 👇`,
+Welcome! Choose an option below 👇
+
+🎮 To play, use /playnow`,
     {
       reply_markup: mainMenuKeyboard,
     },
@@ -78,10 +73,12 @@ Ready to play?`,
   );
 };
 
+// ============================================================
 // CURRENT BALANCE MESSAGE
+// ============================================================
+
 export const sendBalanceMessage = async (bot, chatId) => {
   try {
-    // Find player
     const { data: user, error: userError } = await supabase
       .from("users")
       .select("id")
@@ -89,7 +86,6 @@ export const sendBalanceMessage = async (bot, chatId) => {
       .single();
 
     if (userError) {
-      // User does not exist
       if (userError.code === "PGRST116") {
         await bot.sendMessage(
           chatId,
@@ -103,7 +99,6 @@ Please use /start first.`,
       throw userError;
     }
 
-    // Find wallet
     const { data: wallet, error: walletError } = await supabase
       .from("wallets")
       .select("balance")
@@ -111,7 +106,6 @@ Please use /start first.`,
       .single();
 
     if (walletError) {
-      // Wallet does not exist
       if (walletError.code === "PGRST116") {
         await bot.sendMessage(
           chatId,
@@ -124,7 +118,7 @@ Available Balance:
               inline_keyboard: [
                 [
                   {
-                    text: "🎮 Open Boch Boch",
+                    text: "🎮 Play Boch Boch",
                     web_app: {
                       url: miniAppUrl,
                     },
@@ -154,7 +148,7 @@ ${balance.toLocaleString()} ETB`,
           inline_keyboard: [
             [
               {
-                text: "🎮 Open Boch Boch",
+                text: "🎮 Play Boch Boch",
                 web_app: {
                   url: miniAppUrl,
                 },
@@ -175,6 +169,7 @@ Please try again.`,
     );
   }
 };
+
 // ============================================================
 // WITHDRAW MESSAGE
 // ============================================================
@@ -190,7 +185,7 @@ Withdrawal options will be available here.`,
         inline_keyboard: [
           [
             {
-              text: "🎮 Open Boch Boch",
+              text: "🎮 Play Boch Boch",
               web_app: {
                 url: miniAppUrl,
               },
