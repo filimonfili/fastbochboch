@@ -15,11 +15,7 @@ import { createPendingDeposit } from "../services/depositService.js";
 
 import { rejectWithdrawal } from "../services/adminWithdrawalService.js";
 
-import {
-  sendMainMenu,
-  sendBalanceMessage,
-  sendPaymentMethods,
-} from "./menus/mainMenu.js";
+import { sendMainMenu, sendBalanceMessage } from "./menus/mainMenu.js";
 
 import { sendPaymentMethods } from "./menus/depositMenu.js";
 
