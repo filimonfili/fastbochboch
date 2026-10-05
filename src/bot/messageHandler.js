@@ -531,7 +531,7 @@ Please try again.`,
           chatId,
           `🆘 Support
 
-If you have a problem with your account, deposit, withdrawal, or game, please contact support.`,
+If you have a problem with your account, deposit, withdrawal, or game, please contact @enon28.`,
         );
 
         return;
