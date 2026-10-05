@@ -6,6 +6,7 @@ import { adminSessions } from "../sessions/sessions.js";
 
 export const registerAnnouncementCallbacks = (bot) => {
   bot.on("callback_query", async (query) => {
+    console.log("📲 CALLBACK RECEIVED:", query.data);
     if (!query.message) {
       return;
     }
