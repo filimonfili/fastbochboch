@@ -28,6 +28,13 @@ import supabase from "../config/supabase.js";
 export const registerMessageHandler = (bot) => {
   bot.on("message", async (msg) => {
     try {
+      console.log("📩 TELEGRAM MESSAGE RECEIVED:", {
+        chatId: msg.chat?.id,
+        telegramId: msg.from?.id,
+        text: msg.text || null,
+        hasPhoto: Boolean(msg.photo),
+        photoCount: msg.photo?.length || 0,
+      });
       const chatId = msg.chat.id;
       const telegramId = msg.from?.id;
 
