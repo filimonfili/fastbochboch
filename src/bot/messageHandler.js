@@ -5,7 +5,7 @@ import {
   withdrawalSessions,
   adminSessions,
 } from "./sessions/sessions.js";
-import { getAllPlayers } from "../services/announcementService.js";
+
 import {
   updateTelebirrPhone,
   updateTelebirrAccountName,
@@ -28,11 +28,10 @@ import supabase from "../config/supabase.js";
 export const registerMessageHandler = (bot) => {
   bot.on("message", async (msg) => {
     try {
-      if (!msg.text) return;
-
       const chatId = msg.chat.id;
       const telegramId = msg.from?.id;
-      const text = msg.text.trim();
+
+      const text = msg.text?.trim() || "";
 
       // =========================================================
       // ADMIN SESSION
@@ -52,6 +51,128 @@ export const registerMessageHandler = (bot) => {
             await bot.sendMessage(chatId, "❌ Admin action cancelled.");
 
             await sendAdminMenu(bot, chatId);
+
+            return;
+          }
+
+          // =====================================================
+          // ANNOUNCEMENT — WAITING FOR BANNER
+          // =====================================================
+
+          if (adminSession.action === "WAITING_FOR_ANNOUNCEMENT_BANNER") {
+            if (!msg.photo || msg.photo.length === 0) {
+              await bot.sendMessage(
+                chatId,
+                `❌ Please send an image for the announcement banner.
+
+Send the banner as a photo.
+
+Send /cancel to cancel.`,
+              );
+
+              return;
+            }
+
+            // Telegram gives multiple sizes.
+            // The last one is normally the highest resolution.
+            const largestPhoto = msg.photo[msg.photo.length - 1];
+
+            const bannerFileId = largestPhoto.file_id;
+
+            adminSessions.set(chatId, {
+              action: "WAITING_FOR_ANNOUNCEMENT_TEXT",
+              bannerFileId,
+            });
+
+            await bot.sendMessage(
+              chatId,
+              `🖼️ Banner received successfully.
+
+Now send the announcement text.
+
+You can use text and emojis.
+
+Maximum: 1000 characters.
+
+Send /cancel to cancel.`,
+            );
+
+            return;
+          }
+
+          // =====================================================
+          // ANNOUNCEMENT — WAITING FOR TEXT
+          // =====================================================
+
+          if (adminSession.action === "WAITING_FOR_ANNOUNCEMENT_TEXT") {
+            if (!text) {
+              await bot.sendMessage(
+                chatId,
+                `❌ Announcement text cannot be empty.
+
+Please send the announcement text.
+
+Send /cancel to cancel.`,
+              );
+
+              return;
+            }
+
+            if (text.length > 1000) {
+              await bot.sendMessage(
+                chatId,
+                `❌ Announcement text is too long.
+
+Please keep it under 1000 characters.`,
+              );
+
+              return;
+            }
+
+            if (!adminSession.bannerFileId) {
+              adminSessions.delete(chatId);
+
+              await bot.sendMessage(
+                chatId,
+                `❌ Announcement banner is missing.
+
+Please create the announcement again.`,
+              );
+
+              return;
+            }
+
+            const announcement = text;
+
+            adminSessions.set(chatId, {
+              action: "CONFIRM_ANNOUNCEMENT",
+              bannerFileId: adminSession.bannerFileId,
+              announcement,
+            });
+
+            // ---------------------------------------------------
+            // SEND PREVIEW
+            // ---------------------------------------------------
+
+            await bot.sendPhoto(chatId, adminSession.bannerFileId, {
+              caption: `📢 Fast Boch Boch Announcement\n\n${announcement}`,
+              reply_markup: {
+                inline_keyboard: [
+                  [
+                    {
+                      text: "✅ Send to All Players",
+                      callback_data: "admin_send_announcement",
+                    },
+                  ],
+                  [
+                    {
+                      text: "❌ Cancel",
+                      callback_data: "admin_cancel_announcement",
+                    },
+                  ],
+                ],
+              },
+            });
 
             return;
           }
@@ -291,73 +412,7 @@ It cannot be rejected again.`,
 
                 return;
               }
-              // ========================================================
-              // CREATE ANNOUNCEMENT
-              // ========================================================
 
-              if (adminSession.action === "CREATE_ANNOUNCEMENT") {
-                const announcement = text.trim();
-
-                if (!announcement) {
-                  await bot.sendMessage(
-                    chatId,
-                    `❌ Announcement cannot be empty.
-
-Please send the announcement text.`,
-                  );
-
-                  return;
-                }
-
-                if (announcement.length > 4000) {
-                  await bot.sendMessage(
-                    chatId,
-                    `❌ Announcement is too long.
-
-Please keep it under 4000 characters.`,
-                  );
-
-                  return;
-                }
-
-                adminSessions.set(chatId, {
-                  action: "CONFIRM_ANNOUNCEMENT",
-                  announcement,
-                });
-
-                await bot.sendMessage(
-                  chatId,
-                  `📢 Announcement Preview
-
-━━━━━━━━━━━━━━━
-
-${announcement}
-
-━━━━━━━━━━━━━━━
-
-Send this announcement to all players?`,
-                  {
-                    reply_markup: {
-                      inline_keyboard: [
-                        [
-                          {
-                            text: "✅ Send to All Players",
-                            callback_data: "admin_send_announcement",
-                          },
-                        ],
-                        [
-                          {
-                            text: "❌ Cancel",
-                            callback_data: "admin_cancel_announcement",
-                          },
-                        ],
-                      ],
-                    },
-                  },
-                );
-
-                return;
-              }
               // -----------------------------------------------
               // NOT FOUND
               // -----------------------------------------------
@@ -484,10 +539,6 @@ If you have a problem with your account, deposit, withdrawal, or game, please co
         if (withdrawalSession.step === "AMOUNT") {
           const amount = Number(text);
 
-          // -----------------------------------------------------
-          // INVALID NUMBER
-          // -----------------------------------------------------
-
           if (!Number.isInteger(amount) || amount <= 0) {
             await bot.sendMessage(
               chatId,
@@ -503,10 +554,6 @@ Example:
             return;
           }
 
-          // -----------------------------------------------------
-          // MINIMUM WITHDRAWAL
-          // -----------------------------------------------------
-
           const MIN_WITHDRAWAL = 5;
 
           if (amount < MIN_WITHDRAWAL) {
@@ -520,15 +567,7 @@ Please enter an amount of ${MIN_WITHDRAWAL} ETB or more.`,
             return;
           }
 
-          // -----------------------------------------------------
-          // CHECK BALANCE
-          // -----------------------------------------------------
-
           const currentBalance = withdrawalSession.balance;
-
-          // -----------------------------------------------------
-          // INSUFFICIENT BALANCE
-          // -----------------------------------------------------
 
           if (amount > currentBalance) {
             await bot.sendMessage(
@@ -547,19 +586,11 @@ Please enter an amount up to ${currentBalance} ETB.`,
             return;
           }
 
-          // -----------------------------------------------------
-          // SAVE AMOUNT
-          // -----------------------------------------------------
-
           withdrawalSessions.set(chatId, {
             ...withdrawalSession,
             amount,
             step: "ACCOUNT_NUMBER",
           });
-
-          // -----------------------------------------------------
-          // ASK FOR ACCOUNT NUMBER
-          // -----------------------------------------------------
 
           const paymentName =
             withdrawalSession.paymentMethod === "TELEBIRR"
@@ -592,10 +623,6 @@ Send /cancel to cancel.`,
         if (withdrawalSession.step === "ACCOUNT_NUMBER") {
           const accountNumber = text.replace(/\s+/g, "");
 
-          // -----------------------------------------------------
-          // VALIDATE ETHIOPIAN PHONE
-          // -----------------------------------------------------
-
           if (!/^09\d{8}$/.test(accountNumber)) {
             await bot.sendMessage(
               chatId,
@@ -611,10 +638,6 @@ Example:
             return;
           }
 
-          // -----------------------------------------------------
-          // SAVE ACCOUNT NUMBER
-          // -----------------------------------------------------
-
           withdrawalSessions.set(chatId, {
             ...withdrawalSession,
             accountNumber,
@@ -625,10 +648,6 @@ Example:
             withdrawalSession.paymentMethod === "TELEBIRR"
               ? "Telebirr"
               : "CBE Birr";
-
-          // -----------------------------------------------------
-          // CONFIRMATION
-          // -----------------------------------------------------
 
           await bot.sendMessage(
             chatId,
