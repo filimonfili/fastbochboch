@@ -15,7 +15,11 @@ import { createPendingDeposit } from "../services/depositService.js";
 
 import { rejectWithdrawal } from "../services/adminWithdrawalService.js";
 
-import { sendMainMenu } from "./menus/mainMenu.js";
+import {
+  sendMainMenu,
+  sendBalanceMessage,
+  sendPaymentMethods,
+} from "./menus/mainMenu.js";
 
 import { sendPaymentMethods } from "./menus/depositMenu.js";
 
@@ -497,12 +501,7 @@ Please try again.`,
       // ---------------------------------------------------------
 
       if (text === "💰 Balance") {
-        await bot.sendMessage(
-          chatId,
-          `💰 Balance
-
-Your wallet balance is available inside Boch Boch.`,
-        );
+        await sendBalanceMessage(bot, chatId);
 
         return;
       }
