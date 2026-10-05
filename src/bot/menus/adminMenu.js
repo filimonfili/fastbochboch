@@ -324,7 +324,7 @@ export const sendAdminAnnouncements = async (bot, chatId) => {
     chatId,
     `📢 Announcements
 
-Send a message to all Fast Boch Boch players.
+Create a banner announcement and send it to all Fast Boch Boch players.
 
 Choose an option below 👇`,
     {

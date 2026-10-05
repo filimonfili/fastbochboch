@@ -5,8 +5,10 @@ import { getAllPlayers } from "../../services/announcementService.js";
 import { adminSessions } from "../sessions/sessions.js";
 
 export const registerAnnouncementCallbacks = (bot) => {
+  console.log("🔥 announcementCallbacks.js LOADED - NEW VERSION");
   bot.on("callback_query", async (query) => {
     console.log("📲 CALLBACK RECEIVED:", query.data);
+
     if (!query.message) {
       return;
     }
@@ -14,10 +16,6 @@ export const registerAnnouncementCallbacks = (bot) => {
     const action = query.data;
     const chatId = query.message.chat.id;
     const telegramId = query.from?.id;
-
-    // =====================================================
-    // ONLY HANDLE ANNOUNCEMENT CALLBACKS
-    // =====================================================
 
     const announcementActions = [
       "admin_create_announcement",
@@ -28,10 +26,6 @@ export const registerAnnouncementCallbacks = (bot) => {
     if (!announcementActions.includes(action)) {
       return;
     }
-
-    // =====================================================
-    // ADMIN SECURITY CHECK
-    // =====================================================
 
     if (!telegramId || !isAdmin(telegramId)) {
       try {
@@ -52,22 +46,26 @@ export const registerAnnouncementCallbacks = (bot) => {
     try {
       await bot.answerCallbackQuery(query.id);
 
-      // ===================================================
+      // =====================================================
       // CREATE ANNOUNCEMENT
-      // ===================================================
+      // =====================================================
 
       if (action === "admin_create_announcement") {
+        console.log("🔥 CREATE ANNOUNCEMENT CALLBACK RUNNING");
+
         adminSessions.set(chatId, {
           action: "WAITING_FOR_ANNOUNCEMENT_BANNER",
         });
+
+        console.log("🔥 SESSION AFTER CREATE:", adminSessions.get(chatId));
 
         await bot.sendMessage(
           chatId,
           `📢 Create Announcement
 
-Send the message you want to broadcast to all players.
+🖼️ First, send the banner image for the announcement.
 
-You can use text and emojis.
+Please send it as a photo.
 
 Send /cancel to cancel.`,
         );
@@ -75,28 +73,35 @@ Send /cancel to cancel.`,
         return;
       }
 
-      // ===================================================
-      // CANCEL ANNOUNCEMENT
-      // ===================================================
+      // =====================================================
+      // CANCEL
+      // =====================================================
 
       if (action === "admin_cancel_announcement") {
         adminSessions.delete(chatId);
+
+        console.log("❌ Announcement session cancelled:", {
+          chatId,
+        });
 
         await bot.sendMessage(chatId, "❌ Announcement cancelled.");
 
         return;
       }
 
-      // ===================================================
+      // =====================================================
       // SEND ANNOUNCEMENT
-      // ===================================================
+      // =====================================================
 
       if (action === "admin_send_announcement") {
         const session = adminSessions.get(chatId);
 
+        console.log("📢 SEND ANNOUNCEMENT SESSION:", session);
+
         if (
           !session ||
           session.action !== "CONFIRM_ANNOUNCEMENT" ||
+          !session.bannerFileId ||
           !session.announcement
         ) {
           adminSessions.delete(chatId);
@@ -111,9 +116,8 @@ Please create the announcement again.`,
           return;
         }
 
-        const announcement = session.announcement;
+        const { bannerFileId, announcement } = session;
 
-        // Clear session before broadcasting.
         adminSessions.delete(chatId);
 
         await bot.sendMessage(
@@ -123,9 +127,9 @@ Please create the announcement again.`,
 Please wait.`,
         );
 
-        // =================================================
-        // GET ALL PLAYERS
-        // =================================================
+        // ===================================================
+        // GET PLAYERS
+        // ===================================================
 
         let players;
 
@@ -145,32 +149,24 @@ The announcement was not sent.`,
         }
 
         console.log("====================================");
-
         console.log("📢 ANNOUNCEMENT BROADCAST STARTED");
-
         console.log("📢 Total players found:", players.length);
-
         console.log(
           "📢 Telegram IDs:",
           players.map((player) => player.telegram_id),
         );
-
         console.log("====================================");
-
-        // =================================================
-        // BROADCAST
-        // =================================================
 
         let sent = 0;
         let failed = 0;
         let skipped = 0;
 
+        // ===================================================
+        // BROADCAST
+        // ===================================================
+
         for (const player of players) {
           const playerTelegramId = player.telegram_id;
-
-          // -------------------------------------------------
-          // NO TELEGRAM ID
-          // -------------------------------------------------
 
           if (!playerTelegramId) {
             skipped++;
@@ -180,25 +176,17 @@ The announcement was not sent.`,
             continue;
           }
 
-          // -------------------------------------------------
-          // SEND MESSAGE
-          // -------------------------------------------------
-
           try {
             console.log(`📤 Sending announcement to ${playerTelegramId}...`);
 
-            await bot.sendMessage(
-              playerTelegramId,
-              `📢 Fast Boch Boch Announcement
-
-${announcement}`,
-            );
+            await bot.sendPhoto(playerTelegramId, bannerFileId, {
+              caption: `📢 Fast Boch Boch Announcement\n\n${announcement}`,
+            });
 
             sent++;
 
             console.log(`✅ Announcement sent to ${playerTelegramId}`);
 
-            // Small delay between messages.
             await new Promise((resolve) => setTimeout(resolve, 100));
           } catch (error) {
             failed++;
@@ -213,22 +201,16 @@ ${announcement}`,
           }
         }
 
-        // =================================================
+        // ===================================================
         // FINAL REPORT
-        // =================================================
+        // ===================================================
 
         console.log("====================================");
-
         console.log("📢 ANNOUNCEMENT BROADCAST COMPLETE");
-
         console.log("📢 Total players:", players.length);
-
         console.log("📢 Successfully sent:", sent);
-
         console.log("📢 Failed:", failed);
-
         console.log("📢 Skipped:", skipped);
-
         console.log("====================================");
 
         await bot.sendMessage(
