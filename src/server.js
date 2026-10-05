@@ -137,8 +137,7 @@ const startServer = async () => {
       // --------------------------------------
 
       const webhookUrl =
-        `${process.env.TELEGRAM_WEBHOOK_URL}` ||
-        `https://fastbochboch.onrender.com/api/telegram/webhook`;
+        "https://fastbochboch.onrender.com/api/telegram/webhook";
 
       try {
         await bot.setWebHook(webhookUrl);
