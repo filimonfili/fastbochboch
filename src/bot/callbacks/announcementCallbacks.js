@@ -58,7 +58,7 @@ export const registerAnnouncementCallbacks = (bot) => {
 
       if (action === "admin_create_announcement") {
         adminSessions.set(chatId, {
-          action: "CREATE_ANNOUNCEMENT",
+          action: "WAITING_FOR_ANNOUNCEMENT_BANNER",
         });
 
         await bot.sendMessage(
