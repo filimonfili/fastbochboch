@@ -63,7 +63,7 @@ Ready to play?`,
         inline_keyboard: [
           [
             {
-              text: "🎮 Open Boch Boch",
+              text: "🎮 Play Boch Boch",
               web_app: {
                 url: miniAppUrl,
               },
