@@ -12,6 +12,8 @@ if (!token) {
   throw new Error("❌ TELEGRAM_BOT_TOKEN is missing");
 }
 
+console.log("🚀 Creating Telegram bot...");
+
 const bot = new TelegramBot(token, {
   polling: true,
 });
