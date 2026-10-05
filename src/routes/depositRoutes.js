@@ -2,6 +2,7 @@ import express from "express";
 
 import { verifyMerchantDeposit } from "../services/depositService.js";
 import supabase from "../config/supabase.js";
+import bot from "../bot/bot.js";
 
 const router = express.Router();
 
