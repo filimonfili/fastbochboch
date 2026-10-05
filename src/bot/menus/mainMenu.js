@@ -53,6 +53,8 @@ Welcome! Choose an option below 👇`,
 // ============================================================
 
 export const sendPlayMessage = async (bot, chatId) => {
+  console.log("🎮 PLAY WEB APP URL:", miniAppUrl);
+
   await bot.sendMessage(
     chatId,
     `🎮 Fast Boch Boch
