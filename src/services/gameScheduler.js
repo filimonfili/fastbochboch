@@ -5,7 +5,18 @@ import { createGame } from "./gameService.js";
 
 import { getIO } from "../socket/index.js";
 
+const SHAKE_DURATION_MS = 5 * 1000;
+const REVEAL_DURATION_MS = 5 * 1000;
+const RESULT_DURATION_MS = 10 * 1000;
+
+const TOTAL_DRAW_DURATION_MS =
+  SHAKE_DURATION_MS + REVEAL_DURATION_MS + RESULT_DURATION_MS;
+
 let isRunning = false;
+
+const sleep = (ms) => {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+};
 
 export const startGameScheduler = () => {
   console.log("Game scheduler started.");
@@ -16,30 +27,9 @@ export const startGameScheduler = () => {
     isRunning = true;
 
     try {
-      const now = new Date().toISOString();
-
-      /*
-       * --------------------------------------------------
-       * 1. RECOVER A GAME THAT IS ALREADY DRAWING
-       * --------------------------------------------------
-       *
-       * This is important after a backend restart.
-       *
-       * Example:
-       *
-       * Server changes LIVE -> DRAWING
-       * Server crashes/restarts
-       * Game remains DRAWING
-       *
-       * The old scheduler only searched for LIVE games,
-       * so that game could remain stuck forever.
-       *
-       * If a DRAWING game exists, complete it now.
-       *
-       * The frontend uses draw_at as the official animation
-       * start timestamp, so the backend does not need to
-       * wait for the 22-second presentation.
-       */
+      // --------------------------------------------
+      // 1. RECOVER EXISTING DRAWING GAME
+      // --------------------------------------------
 
       const { data: drawingGame, error: drawingError } = await supabase
         .from("games")
@@ -60,79 +50,22 @@ export const startGameScheduler = () => {
           `🔥 Recovering DRAWING Game #${drawingGame.game_number}...`,
         );
 
-        const io = getIO();
-
-        /*
-         * Tell connected players that the draw is active.
-         */
-        console.log("🔥 EMITTING recovered draw:start:", {
-          gameId: drawingGame.id,
-          gameNumber: drawingGame.game_number,
-          startedAt: drawingGame.draw_at,
-        });
-
-        io.to(`game:${drawingGame.id}`).emit("draw:start", {
-          gameId: drawingGame.id,
-          gameNumber: drawingGame.game_number,
-          startedAt: drawingGame.draw_at,
-        });
-
-        /*
-         * Complete the actual database draw.
-         */
-        const result = await drawGame(drawingGame);
-
-        /*
-         * Tell connected players the official result.
-         */
-        console.log("🔥 EMITTING recovered draw:result:", {
-          gameId: drawingGame.id,
-          gameNumber: drawingGame.game_number,
-          winnerSlot: result?.slot_number ?? null,
-          prizeAmount: result?.prize_amount ?? 0,
-          soldSlots: result?.sold_count ?? 0,
-          startedAt: drawingGame.draw_at,
-        });
-
-        io.to(`game:${drawingGame.id}`).emit("draw:result", {
-          gameId: drawingGame.id,
-          gameNumber: drawingGame.game_number,
-          winnerSlot: result?.slot_number ?? null,
-          prizeAmount: result?.prize_amount ?? 0,
-          soldSlots: result?.sold_count ?? 0,
-          startedAt: drawingGame.draw_at,
-        });
-
-        console.log(
-          `🔥 Recovered Game #${drawingGame.game_number} successfully.`,
-        );
-
-        /*
-         * Create the next game.
-         */
-        const nextGame = await createGame();
-
-        io.emit("game:new", {
-          gameId: nextGame.id,
-          gameNumber: nextGame.game_number,
-        });
-
-        console.log(`🔥 Next game created: #${nextGame.game_number}`);
+        await processDrawingGame(drawingGame);
 
         return;
       }
 
-      /*
-       * --------------------------------------------------
-       * 2. FIND A LIVE GAME WHOSE COUNTDOWN FINISHED
-       * --------------------------------------------------
-       */
+      // --------------------------------------------
+      // 2. FIND EXPIRED LIVE GAME
+      // --------------------------------------------
+
+      const nowISO = new Date().toISOString();
 
       const { data: games, error } = await supabase
         .from("games")
         .select("*")
         .eq("status", "LIVE")
-        .lte("draw_at", now)
+        .lte("draw_at", nowISO)
         .order("draw_at", {
           ascending: true,
         })
@@ -148,11 +81,9 @@ export const startGameScheduler = () => {
 
       const game = games[0];
 
-      /*
-       * --------------------------------------------------
-       * 3. CLAIM THE LIVE GAME
-       * --------------------------------------------------
-       */
+      // --------------------------------------------
+      // 3. ATOMIC LIVE → DRAWING
+      // --------------------------------------------
 
       const { data: lockedGame, error: lockError } = await supabase
         .from("games")
@@ -168,94 +99,186 @@ export const startGameScheduler = () => {
         throw lockError;
       }
 
-      /*
-       * Another scheduler/server already claimed it.
-       */
       if (!lockedGame) {
         return;
       }
 
-      const io = getIO();
+      console.log(`🔥 Game #${lockedGame.game_number} changed LIVE → DRAWING`);
 
-      /*
-       * draw_at is the authoritative draw-start time.
-       */
-      const drawStartedAt = lockedGame.draw_at;
-
-      /*
-       * --------------------------------------------------
-       * 4. EMIT DRAW START
-       * --------------------------------------------------
-       */
-
-      console.log("🔥 EMITTING draw:start:", {
-        gameId: lockedGame.id,
-        gameNumber: lockedGame.game_number,
-        startedAt: drawStartedAt,
-      });
-
-      io.to(`game:${lockedGame.id}`).emit("draw:start", {
-        gameId: lockedGame.id,
-        gameNumber: lockedGame.game_number,
-        startedAt: drawStartedAt,
-      });
-
-      console.log(
-        `🔥 Draw started for Game #${lockedGame.game_number} at ${drawStartedAt}`,
-      );
-
-      /*
-       * --------------------------------------------------
-       * 5. DETERMINE WINNER + PAYOUT
-       * --------------------------------------------------
-       */
-
-      const result = await drawGame(lockedGame);
-
-      /*
-       * --------------------------------------------------
-       * 6. EMIT OFFICIAL RESULT
-       * --------------------------------------------------
-       */
-
-      console.log("🔥 EMITTING draw:result:", {
-        gameId: lockedGame.id,
-        gameNumber: lockedGame.game_number,
-        winnerSlot: result?.slot_number ?? null,
-        prizeAmount: result?.prize_amount ?? 0,
-        soldSlots: result?.sold_count ?? 0,
-        startedAt: drawStartedAt,
-      });
-
-      io.to(`game:${lockedGame.id}`).emit("draw:result", {
-        gameId: lockedGame.id,
-        gameNumber: lockedGame.game_number,
-        winnerSlot: result?.slot_number ?? null,
-        prizeAmount: result?.prize_amount ?? 0,
-        soldSlots: result?.sold_count ?? 0,
-        startedAt: drawStartedAt,
-      });
-
-      console.log(`Game #${lockedGame.game_number} finished.`);
-
-      /*
-       * --------------------------------------------------
-       * 7. CREATE NEXT GAME
-       * --------------------------------------------------
-       */
-
-      const nextGame = await createGame();
-
-      io.emit("game:new", {
-        gameId: nextGame.id,
-        gameNumber: nextGame.game_number,
-      });
-
-      console.log(`Next game created: #${nextGame.game_number}`);
+      await processDrawingGame(lockedGame);
     } catch (error) {
       console.error("Game scheduler error:", error);
     } finally {
       isRunning = false;
     }
   }, 1000);
+};
+
+// ============================================================
+// PROCESS DRAWING GAME
+// ============================================================
+
+const processDrawingGame = async (game) => {
+  const io = getIO();
+
+  const drawStartedAt = new Date(game.draw_at).getTime();
+
+  if (Number.isNaN(drawStartedAt)) {
+    throw new Error(
+      `Invalid draw_at for Game #${game.game_number}: ${game.draw_at}`,
+    );
+  }
+
+  // --------------------------------------------
+  // SERVER AUTHORITATIVE TIMELINE
+  // --------------------------------------------
+
+  const shakeEndsAt = drawStartedAt + SHAKE_DURATION_MS;
+
+  const revealEndsAt = shakeEndsAt + REVEAL_DURATION_MS;
+
+  const resultEndsAt = revealEndsAt + RESULT_DURATION_MS;
+
+  const timeline = {
+    startedAt: new Date(drawStartedAt).toISOString(),
+
+    shakeEndsAt: new Date(shakeEndsAt).toISOString(),
+
+    revealEndsAt: new Date(revealEndsAt).toISOString(),
+
+    resultEndsAt: new Date(resultEndsAt).toISOString(),
+
+    totalDurationMs: TOTAL_DRAW_DURATION_MS,
+  };
+
+  console.log("🔥 SERVER DRAW TIMELINE:", {
+    gameId: game.id,
+    gameNumber: game.game_number,
+    ...timeline,
+  });
+
+  // --------------------------------------------
+  // DRAW START
+  // --------------------------------------------
+
+  console.log("🔥 EMITTING draw:start");
+
+  io.to(`game:${game.id}`).emit("draw:start", {
+    gameId: game.id,
+    gameNumber: game.game_number,
+
+    // authoritative timestamps
+    ...timeline,
+
+    // server's current time
+    serverTime: new Date().toISOString(),
+  });
+
+  // --------------------------------------------
+  // WAIT UNTIL SHAKE ENDS
+  // --------------------------------------------
+
+  await waitUntil(shakeEndsAt);
+
+  // --------------------------------------------
+  // ACTUAL DRAW
+  // --------------------------------------------
+
+  console.log(`🎯 Performing actual draw for Game #${game.game_number}`);
+
+  let result = null;
+
+  try {
+    result = await drawGame(game);
+  } catch (error) {
+    console.error(
+      `❌ Failed to complete draw for Game #${game.game_number}:`,
+      error,
+    );
+
+    throw error;
+  }
+
+  // --------------------------------------------
+  // DRAW RESULT
+  // --------------------------------------------
+
+  console.log("🔥 EMITTING draw:result:", {
+    gameId: game.id,
+    gameNumber: game.game_number,
+    winnerSlot: result?.slot_number ?? null,
+    prizeAmount: result?.prize_amount ?? 0,
+    soldSlots: result?.sold_count ?? 0,
+  });
+
+  io.to(`game:${game.id}`).emit("draw:result", {
+    gameId: game.id,
+    gameNumber: game.game_number,
+
+    winnerSlot: result?.slot_number ?? null,
+    prizeAmount: result?.prize_amount ?? 0,
+    soldSlots: result?.sold_count ?? 0,
+
+    // SAME authoritative timeline
+    ...timeline,
+
+    serverTime: new Date().toISOString(),
+  });
+
+  // --------------------------------------------
+  // WAIT UNTIL RESULT ENDS
+  // --------------------------------------------
+
+  await waitUntil(resultEndsAt);
+
+  // --------------------------------------------
+  // FINISH GAME
+  // --------------------------------------------
+
+  const { error: finishError } = await supabase
+    .from("games")
+    .update({
+      status: "FINISHED",
+    })
+    .eq("id", game.id)
+    .eq("status", "DRAWING");
+
+  if (finishError) {
+    throw finishError;
+  }
+
+  console.log(
+    `🏁 Game #${game.game_number} finished after 20s draw presentation.`,
+  );
+
+  // --------------------------------------------
+  // CREATE NEXT GAME
+  // --------------------------------------------
+
+  const nextGame = await createGame();
+
+  console.log(`🔥 Next game created: #${nextGame.game_number}`);
+
+  io.emit("game:new", {
+    gameId: nextGame.id,
+    gameNumber: nextGame.game_number,
+
+    serverTime: new Date().toISOString(),
+  });
+};
+
+// ============================================================
+// WAIT UNTIL SERVER TIME
+// ============================================================
+
+const waitUntil = async (targetTime) => {
+  while (true) {
+    const remaining = targetTime - Date.now();
+
+    if (remaining <= 0) {
+      return;
+    }
+
+    await sleep(Math.min(remaining, 1000));
+  }
 };
