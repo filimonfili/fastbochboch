@@ -760,7 +760,7 @@ Do you want to continue?`,
       const result = await createPendingDeposit({
         telegramId,
         paymentMethod: "TELEBIRR",
-        playerSms: text,
+        playerMessage: text,
       });
 
       console.log("💰 Deposit result:", result);
