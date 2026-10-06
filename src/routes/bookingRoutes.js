@@ -49,7 +49,10 @@ router.post("/", requireAuth, async (req, res) => {
       });
     }
 
-    // Book all selected slots atomically
+    // ==========================================
+    // BOOK ALL SELECTED SLOTS ATOMICALLY
+    // ==========================================
+
     const { data, error } = await supabase.rpc("book_slots", {
       p_user_id: req.user.userId,
       p_game_id: gameId,
@@ -65,7 +68,47 @@ router.post("/", requireAuth, async (req, res) => {
     }
 
     // ==========================================
-    // SOCKET: TELL ALL PLAYERS THIS SLOT IS BOOKED
+    // GET UPDATED GAME TOTALS
+    // ==========================================
+
+    const { data: game, error: gameError } = await supabase
+      .from("games")
+      .select("id, total_slots, slot_price")
+      .eq("id", gameId)
+      .single();
+
+    if (gameError || !game) {
+      console.error("Failed to get game after booking:", gameError);
+
+      return res.status(500).json({
+        message: "Slots were booked, but failed to get updated game state",
+      });
+    }
+
+    // Count all booked slots for this game
+    const { count: soldSlots, error: countError } = await supabase
+      .from("bookings")
+      .select("id", {
+        count: "exact",
+        head: true,
+      })
+      .eq("game_id", gameId);
+
+    if (countError) {
+      console.error("Failed to count sold slots:", countError);
+
+      return res.status(500).json({
+        message: "Slots were booked, but failed to calculate game totals",
+      });
+    }
+
+    const totalSoldSlots = soldSlots || 0;
+
+    // Prize = sold slots × 16 ETB
+    const totalPrize = totalSoldSlots * 16;
+
+    // ==========================================
+    // SOCKET: BROADCAST UPDATED GAME STATE
     // ==========================================
 
     const io = getIO();
@@ -73,16 +116,26 @@ router.post("/", requireAuth, async (req, res) => {
     io.to(`game:${gameId}`).emit("slot:booked", {
       gameId,
       slotNumbers: uniqueSlots,
+      soldSlots: totalSoldSlots,
+      totalPrize,
     });
 
     console.log("🔥 SLOT BOOKED EVENT EMITTED:", {
       gameId,
       slotNumbers: uniqueSlots,
+      soldSlots: totalSoldSlots,
+      totalPrize,
     });
+
+    // ==========================================
+    // RESPONSE
+    // ==========================================
 
     return res.status(201).json({
       message: "Slots booked successfully",
       booking: data,
+      soldSlots: totalSoldSlots,
+      totalPrize,
     });
   } catch (error) {
     console.error("Create booking error:", error);
