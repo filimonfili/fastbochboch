@@ -35,9 +35,9 @@ export const registerMessageHandler = (bot) => {
         hasPhoto: Boolean(msg.photo),
         photoCount: msg.photo?.length || 0,
       });
+
       const chatId = msg.chat.id;
       const telegramId = msg.from?.id;
-
       const text = msg.text?.trim() || "";
 
       // =========================================================
@@ -46,6 +46,7 @@ export const registerMessageHandler = (bot) => {
 
       if (telegramId && isAdmin(telegramId)) {
         const adminSession = adminSessions.get(chatId);
+
         console.log("🔎 ADMIN SESSION:", {
           chatId,
           telegramId,
@@ -80,6 +81,7 @@ export const registerMessageHandler = (bot) => {
               hasPhoto: Boolean(msg.photo),
               photoCount: msg.photo?.length || 0,
             });
+
             if (!msg.photo || msg.photo.length === 0) {
               await bot.sendMessage(
                 chatId,
@@ -93,10 +95,7 @@ Send /cancel to cancel.`,
               return;
             }
 
-            // Telegram gives multiple sizes.
-            // The last one is normally the highest resolution.
             const largestPhoto = msg.photo[msg.photo.length - 1];
-
             const bannerFileId = largestPhoto.file_id;
 
             adminSessions.set(chatId, {
@@ -130,6 +129,7 @@ Send /cancel to cancel.`,
               telegramId,
               textLength: text.length,
             });
+
             if (!text) {
               await bot.sendMessage(
                 chatId,
@@ -174,14 +174,12 @@ Please create the announcement again.`,
               bannerFileId: adminSession.bannerFileId,
               announcement,
             });
+
             console.log("📢 ANNOUNCEMENT PREVIEW READY", {
               chatId,
               bannerFileId: adminSession.bannerFileId,
               textLength: announcement.length,
             });
-            // ---------------------------------------------------
-            // SEND PREVIEW
-            // ---------------------------------------------------
 
             await bot.sendPhoto(chatId, adminSession.bannerFileId, {
               caption: `📢 Fast Boch Boch Announcement\n\n${announcement}`,
@@ -342,10 +340,6 @@ Please open the withdrawal request again.`,
 
               adminSessions.delete(chatId);
 
-              // -------------------------------------------------
-              // ADMIN CONFIRMATION
-              // -------------------------------------------------
-
               await bot.sendMessage(
                 chatId,
                 `❌ Withdrawal Rejected
@@ -362,10 +356,6 @@ ${reason}
 The player's money has been refunded automatically.`,
               );
 
-              // -------------------------------------------------
-              // FIND PLAYER
-              // -------------------------------------------------
-
               const { data: user, error: userError } = await supabase
                 .from("users")
                 .select("telegram_id")
@@ -378,10 +368,6 @@ The player's money has been refunded automatically.`,
                   userError,
                 );
               }
-
-              // -------------------------------------------------
-              // NOTIFY PLAYER
-              // -------------------------------------------------
 
               if (user?.telegram_id) {
                 try {
@@ -425,10 +411,6 @@ You can submit another withdrawal request if needed.`,
 
               const message = error?.message || "";
 
-              // -----------------------------------------------
-              // ALREADY PROCESSED
-              // -----------------------------------------------
-
               if (message.includes("WITHDRAWAL_ALREADY_PROCESSED")) {
                 adminSessions.delete(chatId);
 
@@ -442,10 +424,6 @@ It cannot be rejected again.`,
                 return;
               }
 
-              // -----------------------------------------------
-              // NOT FOUND
-              // -----------------------------------------------
-
               if (message.includes("WITHDRAWAL_NOT_FOUND")) {
                 adminSessions.delete(chatId);
 
@@ -458,10 +436,6 @@ The request may have already been removed or processed.`,
 
                 return;
               }
-
-              // -----------------------------------------------
-              // UNKNOWN ERROR
-              // -----------------------------------------------
 
               await bot.sendMessage(
                 chatId,
@@ -482,49 +456,25 @@ Please try again.`,
       // PLAYER MENU BUTTONS
       // =========================================================
 
-      // ---------------------------------------------------------
-      // PLAY
-      // ---------------------------------------------------------
-
       if (text === "🎮 Play Boch Boch") {
         await sendMainMenu(bot, chatId);
-
         return;
       }
-
-      // ---------------------------------------------------------
-      // BALANCE
-      // ---------------------------------------------------------
 
       if (text === "💰 Balance") {
         await sendBalanceMessage(bot, chatId);
-
         return;
       }
-
-      // ---------------------------------------------------------
-      // DEPOSIT
-      // ---------------------------------------------------------
 
       if (text === "➕ Deposit") {
         await sendPaymentMethods(bot, chatId);
-
         return;
       }
-
-      // ---------------------------------------------------------
-      // WITHDRAW
-      // ---------------------------------------------------------
 
       if (text === "💸 Withdraw") {
         await startWithdrawal(bot, msg);
-
         return;
       }
-
-      // ---------------------------------------------------------
-      // SUPPORT
-      // ---------------------------------------------------------
 
       if (text === "🆘 Support") {
         await bot.sendMessage(
@@ -544,10 +494,6 @@ If you have a problem with your account, deposit, withdrawal, or game, please co
       const withdrawalSession = withdrawalSessions.get(chatId);
 
       if (withdrawalSession) {
-        // -------------------------------------------------------
-        // CANCEL
-        // -------------------------------------------------------
-
         if (text === "/cancel") {
           withdrawalSessions.delete(chatId);
 
@@ -766,11 +712,21 @@ Do you want to continue?`,
       console.log("💰 Deposit result:", result);
 
       // =========================================================
+      // READ VERIFICATION RESULT
+      // =========================================================
+
+      const status = result?.verification?.reason;
+
+      console.log("💰 Deposit verification status:", status);
+
+      // =========================================================
       // DEPOSIT APPROVED
       // =========================================================
 
-      if (result.status === "DEPOSIT_APPROVED") {
+      if (status === "DEPOSIT_APPROVED") {
         depositSessions.delete(chatId);
+
+        const amount = Number(result?.verification?.amount || 0);
 
         await bot.sendMessage(
           chatId,
@@ -778,7 +734,7 @@ Do you want to continue?`,
 
 💰 Amount:
 
-${result.amount} ETB
+${amount.toLocaleString()} ETB
 
 Your wallet has been credited successfully.
 
@@ -806,7 +762,7 @@ Your wallet has been credited successfully.
       // WAITING FOR MERCHANT
       // =========================================================
 
-      if (result.status === "WAITING_FOR_MERCHANT") {
+      if (status === "WAITING_FOR_MERCHANT") {
         await bot.sendMessage(
           chatId,
           `⏳ Deposit Received
@@ -827,7 +783,7 @@ Please do not submit the same payment again.`,
       // ALREADY APPROVED
       // =========================================================
 
-      if (result.status === "ALREADY_APPROVED") {
+      if (status === "ALREADY_APPROVED") {
         depositSessions.delete(chatId);
 
         await bot.sendMessage(
@@ -844,7 +800,7 @@ If you believe this is an error, please contact support.`,
       // WAITING FOR PLAYER
       // =========================================================
 
-      if (result.status === "WAITING_FOR_PLAYER") {
+      if (status === "WAITING_FOR_PLAYER") {
         await bot.sendMessage(
           chatId,
           `⏳ Payment Found
@@ -861,10 +817,7 @@ Please send your Telebirr SMS or FT reference number.`,
       // DUPLICATE / ALREADY SUBMITTED
       // =========================================================
 
-      if (
-        result.status === "DUPLICATE" ||
-        result.status === "ALREADY_PENDING"
-      ) {
+      if (status === "DUPLICATE" || status === "ALREADY_PENDING") {
         await bot.sendMessage(
           chatId,
           `⚠️ This transaction is already being processed.
@@ -880,6 +833,11 @@ Do not submit the same FT reference again.`,
       // =========================================================
       // UNKNOWN RESULT
       // =========================================================
+
+      console.error("❌ Unknown deposit verification status:", {
+        status,
+        result,
+      });
 
       await bot.sendMessage(
         chatId,
