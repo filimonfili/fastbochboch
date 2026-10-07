@@ -215,6 +215,9 @@ const processDrawingGame = async (game) => {
     gameNumber: game.game_number,
 
     winnerSlot: result?.slot_number ?? null,
+    winnerUserId: result?.winnerUserId ?? null,
+    winnerName: result?.winnerName ?? null,
+
     prizeAmount: result?.prize_amount ?? 0,
     soldSlots: result?.sold_count ?? 0,
 
