@@ -40,11 +40,103 @@ const buildDrawTimeline = (drawAt) => {
 };
 
 // ============================================================
+// RECOVER EXPIRED LIVE GAME
+// ============================================================
+//
+// This is important for Render cold starts.
+//
+// If Render was sleeping when draw_at passed:
+//
+// LIVE
+//   ↓
+// draw_at expires while server is asleep
+//   ↓
+// player opens the app
+//   ↓
+// this function changes LIVE → DRAWING
+//
+// The draw presentation starts NOW because the original
+// draw_at may be hours in the past.
+//
+// The scheduler will then see DRAWING and perform drawGame().
+// ============================================================
+
+const recoverExpiredLiveGame = async () => {
+  const now = new Date();
+
+  const { data: expiredGame, error: findError } = await supabase
+    .from("games")
+    .select("*")
+    .eq("status", "LIVE")
+    .not("draw_at", "is", null)
+    .lte("draw_at", now.toISOString())
+    .order("draw_at", {
+      ascending: true,
+    })
+    .limit(1)
+    .maybeSingle();
+
+  if (findError) {
+    throw findError;
+  }
+
+  if (!expiredGame) {
+    return null;
+  }
+
+  // ----------------------------------------------------------
+  // IMPORTANT:
+  // Use NOW as the new draw start time.
+  // ----------------------------------------------------------
+
+  const recoveryDrawAt = now.toISOString();
+
+  const { data: recoveredGame, error: recoverError } = await supabase
+    .from("games")
+    .update({
+      status: "DRAWING",
+      draw_at: recoveryDrawAt,
+      countdown_started_at: recoveryDrawAt,
+    })
+    .eq("id", expiredGame.id)
+    .eq("status", "LIVE")
+    .select()
+    .maybeSingle();
+
+  if (recoverError) {
+    throw recoverError;
+  }
+
+  // Another request/server already recovered it.
+  if (!recoveredGame) {
+    return null;
+  }
+
+  console.log(`🔥 RECOVERED Game #${recoveredGame.game_number}`);
+
+  console.log(`🔥 LIVE → DRAWING`);
+
+  console.log(`🔥 Recovery draw started at ${recoveryDrawAt}`);
+
+  return recoveredGame;
+};
+
+// ============================================================
 // GET CURRENT GAME
 // ============================================================
 
 router.get("/current", requireAuth, async (req, res) => {
   try {
+    // --------------------------------------------------------
+    // RECOVER EXPIRED GAME FIRST
+    // --------------------------------------------------------
+
+    await recoverExpiredLiveGame();
+
+    // --------------------------------------------------------
+    // GET CURRENT ACTIVE GAME
+    // --------------------------------------------------------
+
     const { data: game, error: gameError } = await supabase
       .from("games")
       .select("*")
@@ -65,6 +157,10 @@ router.get("/current", requireAuth, async (req, res) => {
       });
     }
 
+    // --------------------------------------------------------
+    // COUNT SOLD SLOTS
+    // --------------------------------------------------------
+
     const { count, error: countError } = await supabase
       .from("slots")
       .select("*", {
@@ -78,17 +174,19 @@ router.get("/current", requireAuth, async (req, res) => {
       throw countError;
     }
 
-    res.json({
+    return res.json({
       game,
 
       soldSlots: count || 0,
 
       remainingSlots: game.total_slots - (count || 0),
+
+      serverTime: new Date().toISOString(),
     });
   } catch (error) {
     console.error("Get current game error:", error);
 
-    res.status(500).json({
+    return res.status(500).json({
       message: "Failed to get current game",
     });
   }
@@ -100,6 +198,12 @@ router.get("/current", requireAuth, async (req, res) => {
 
 router.get("/current/slots", requireAuth, async (req, res) => {
   try {
+    // ------------------------------------------------------
+    // ALSO RECOVER HERE
+    // ------------------------------------------------------
+
+    await recoverExpiredLiveGame();
+
     const { data: game, error: gameError } = await supabase
       .from("games")
       .select("id")
@@ -133,13 +237,13 @@ router.get("/current/slots", requireAuth, async (req, res) => {
       throw slotsError;
     }
 
-    res.json({
+    return res.json({
       bookedSlots: slots.map((slot) => slot.slot_number),
     });
   } catch (error) {
     console.error("Get booked slots error:", error);
 
-    res.status(500).json({
+    return res.status(500).json({
       message: "Failed to get booked slots",
     });
   }
@@ -213,7 +317,7 @@ router.get("/:gameId/result", requireAuth, async (req, res) => {
       throw winnerError;
     }
 
-    res.json({
+    return res.json({
       active: true,
 
       gameId: game.id,
@@ -239,7 +343,7 @@ router.get("/:gameId/result", requireAuth, async (req, res) => {
   } catch (error) {
     console.error("Get game result error:", error);
 
-    res.status(500).json({
+    return res.status(500).json({
       message: "Failed to get game result",
     });
   }
@@ -251,6 +355,12 @@ router.get("/:gameId/result", requireAuth, async (req, res) => {
 
 router.get("/current-draw", requireAuth, async (req, res) => {
   try {
+    // ======================================================
+    // FIRST: RECOVER EXPIRED LIVE GAME
+    // ======================================================
+
+    await recoverExpiredLiveGame();
+
     // ======================================================
     // CURRENT DRAWING GAME
     // ======================================================
@@ -276,6 +386,10 @@ router.get("/current-draw", requireAuth, async (req, res) => {
     if (drawingGame) {
       const timeline = buildDrawTimeline(drawingGame.draw_at);
 
+      // ----------------------------------------------------
+      // SOLD SLOTS
+      // ----------------------------------------------------
+
       const { count: soldSlots, error: soldError } = await supabase
         .from("slots")
         .select("*", {
@@ -289,13 +403,9 @@ router.get("/current-draw", requireAuth, async (req, res) => {
         throw soldError;
       }
 
-      /*
-       * Try to get the winner.
-       *
-       * Normally the winner may not exist during
-       * the first 5 seconds because drawGame()
-       * has not completed yet.
-       */
+      // ----------------------------------------------------
+      // WINNER
+      // ----------------------------------------------------
 
       const { data: winner, error: winnerError } = await supabase
         .from("winners")
@@ -336,12 +446,6 @@ router.get("/current-draw", requireAuth, async (req, res) => {
     // ======================================================
     // RECOVER RECENT FINISHED DRAW
     // ======================================================
-
-    /*
-     * Use the server's current time.
-     *
-     * We only look back 20 seconds.
-     */
 
     const recoveryWindowStart = new Date(
       Date.now() - DRAW_PRESENTATION_DURATION_MS,
@@ -384,10 +488,9 @@ router.get("/current-draw", requireAuth, async (req, res) => {
 
     const resultEndsAt = new Date(timeline.resultEndsAt).getTime();
 
-    /*
-     * The 20-second draw presentation
-     * has already finished.
-     */
+    // ======================================================
+    // PRESENTATION FINISHED
+    // ======================================================
 
     if (now >= resultEndsAt) {
       return res.json({
@@ -459,7 +562,7 @@ router.get("/current-draw", requireAuth, async (req, res) => {
   } catch (error) {
     console.error("Check current draw error:", error);
 
-    res.status(500).json({
+    return res.status(500).json({
       message: "Failed to check current draw",
     });
   }

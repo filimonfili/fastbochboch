@@ -3,6 +3,7 @@ import jwt from "jsonwebtoken";
 import supabase from "../config/supabase.js";
 import { authenticateTelegramUser } from "../services/authService.js";
 import { requireAuth } from "../middleware/authMiddleware.js";
+
 const router = express.Router();
 
 router.post("/telegram", async (req, res) => {
@@ -14,6 +15,8 @@ router.post("/telegram", async (req, res) => {
         message: "Telegram initData is required",
       });
     }
+
+    console.log("🔐 Telegram authentication started...");
 
     const user = await authenticateTelegramUser(initData);
 
@@ -28,18 +31,21 @@ router.post("/telegram", async (req, res) => {
       },
     );
 
-    res.json({
+    console.log(`✅ Telegram authentication successful: ${user.telegram_id}`);
+
+    return res.json({
       token,
       user,
     });
   } catch (error) {
-    console.error("Telegram authentication error:", error);
+    console.error("❌ Telegram authentication error:", error);
 
-    res.status(401).json({
+    return res.status(401).json({
       message: error.message || "Authentication failed",
     });
   }
 });
+
 router.get("/me", requireAuth, async (req, res) => {
   try {
     const { data: user, error } = await supabase
@@ -52,15 +58,16 @@ router.get("/me", requireAuth, async (req, res) => {
       throw error;
     }
 
-    res.json({
+    return res.json({
       user,
     });
   } catch (error) {
-    console.error("Get current user error:", error);
+    console.error("❌ Get current user error:", error);
 
-    res.status(500).json({
+    return res.status(500).json({
       message: "Failed to get user",
     });
   }
 });
+
 export default router;
