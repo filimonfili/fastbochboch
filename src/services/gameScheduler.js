@@ -27,9 +27,9 @@ export const startGameScheduler = () => {
     isRunning = true;
 
     try {
-      // --------------------------------------------
-      // 1. RECOVER EXISTING DRAWING GAME
-      // --------------------------------------------
+      // =========================================================
+      // RECOVER DRAWING GAME AFTER SERVER RESTART
+      // =========================================================
 
       const { data: drawingGame, error: drawingError } = await supabase
         .from("games")
@@ -55,9 +55,9 @@ export const startGameScheduler = () => {
         return;
       }
 
-      // --------------------------------------------
-      // 2. FIND EXPIRED LIVE GAME
-      // --------------------------------------------
+      // =========================================================
+      // FIND LIVE GAME THAT HAS REACHED DRAW TIME
+      // =========================================================
 
       const nowISO = new Date().toISOString();
 
@@ -81,9 +81,10 @@ export const startGameScheduler = () => {
 
       const game = games[0];
 
-      // --------------------------------------------
-      // 3. ATOMIC LIVE → DRAWING
-      // --------------------------------------------
+      // =========================================================
+      // LOCK GAME
+      // LIVE → DRAWING
+      // =========================================================
 
       const { data: lockedGame, error: lockError } = await supabase
         .from("games")
@@ -114,9 +115,9 @@ export const startGameScheduler = () => {
   }, 1000);
 };
 
-// ============================================================
+// =========================================================
 // PROCESS DRAWING GAME
-// ============================================================
+// =========================================================
 
 const processDrawingGame = async (game) => {
   const io = getIO();
@@ -129,9 +130,9 @@ const processDrawingGame = async (game) => {
     );
   }
 
-  // --------------------------------------------
-  // SERVER AUTHORITATIVE TIMELINE
-  // --------------------------------------------
+  // =========================================================
+  // DRAW TIMELINE
+  // =========================================================
 
   const shakeEndsAt = drawStartedAt + SHAKE_DURATION_MS;
 
@@ -157,9 +158,9 @@ const processDrawingGame = async (game) => {
     ...timeline,
   });
 
-  // --------------------------------------------
+  // =========================================================
   // DRAW START
-  // --------------------------------------------
+  // =========================================================
 
   console.log("🔥 EMITTING draw:start");
 
@@ -167,22 +168,20 @@ const processDrawingGame = async (game) => {
     gameId: game.id,
     gameNumber: game.game_number,
 
-    // authoritative timestamps
     ...timeline,
 
-    // server's current time
     serverTime: new Date().toISOString(),
   });
 
-  // --------------------------------------------
-  // WAIT UNTIL SHAKE ENDS
-  // --------------------------------------------
+  // =========================================================
+  // WAIT FOR SHAKE TO FINISH
+  // =========================================================
 
   await waitUntil(shakeEndsAt);
 
-  // --------------------------------------------
+  // =========================================================
   // ACTUAL DRAW
-  // --------------------------------------------
+  // =========================================================
 
   console.log(`🎯 Performing actual draw for Game #${game.game_number}`);
 
@@ -199,9 +198,9 @@ const processDrawingGame = async (game) => {
     throw error;
   }
 
-  // --------------------------------------------
-  // DRAW RESULT
-  // --------------------------------------------
+  // =========================================================
+  // SEND WINNER RESULT
+  // =========================================================
 
   console.log("🔥 EMITTING draw:result:", {
     gameId: game.id,
@@ -219,21 +218,20 @@ const processDrawingGame = async (game) => {
     prizeAmount: result?.prize_amount ?? 0,
     soldSlots: result?.sold_count ?? 0,
 
-    // SAME authoritative timeline
     ...timeline,
 
     serverTime: new Date().toISOString(),
   });
 
-  // --------------------------------------------
-  // WAIT UNTIL RESULT ENDS
-  // --------------------------------------------
+  // =========================================================
+  // WAIT FOR RESULT PRESENTATION TO FINISH
+  // =========================================================
 
   await waitUntil(resultEndsAt);
 
-  // --------------------------------------------
+  // =========================================================
   // FINISH GAME
-  // --------------------------------------------
+  // =========================================================
 
   const { error: finishError } = await supabase
     .from("games")
@@ -251,13 +249,42 @@ const processDrawingGame = async (game) => {
     `🏁 Game #${game.game_number} finished after 20s draw presentation.`,
   );
 
-  // --------------------------------------------
+  // =========================================================
+  // CLEAN TEMPORARY GAME DATA
+  // =========================================================
+  //
+  // slots.game_id -> games.id ON DELETE CASCADE
+  //
+  // bookings.slot_id -> slots.id ON DELETE CASCADE
+  //
+  // Therefore deleting the slots automatically deletes
+  // their related bookings.
+  //
+  // We keep:
+  // - games
+  // - users
+  // - wallets
+  // - transactions
+  // - deposits
+  //
+  // We delete:
+  // - slots
+  // - related bookings
+  // =========================================================
+
+  await cleanupFinishedGame(game.id, game.game_number);
+
+  // =========================================================
   // CREATE NEXT GAME
-  // --------------------------------------------
+  // =========================================================
 
   const nextGame = await createGame();
 
   console.log(`🔥 Next game created: #${nextGame.game_number}`);
+
+  // =========================================================
+  // NOTIFY ALL CONNECTED PLAYERS
+  // =========================================================
 
   io.emit("game:new", {
     gameId: nextGame.id,
@@ -267,9 +294,27 @@ const processDrawingGame = async (game) => {
   });
 };
 
-// ============================================================
-// WAIT UNTIL SERVER TIME
-// ============================================================
+// =========================================================
+// CLEAN FINISHED GAME TEMPORARY DATA
+// =========================================================
+
+const cleanupFinishedGame = async (gameId, gameNumber) => {
+  console.log(`🧹 Cleaning temporary data for Game #${gameNumber}...`);
+
+  const { error } = await supabase.from("slots").delete().eq("game_id", gameId);
+
+  if (error) {
+    console.error(`❌ Failed to clean slots for Game #${gameNumber}:`, error);
+
+    throw error;
+  }
+
+  console.log(`🧹 Game #${gameNumber} temporary slot data cleaned.`);
+};
+
+// =========================================================
+// WAIT UNTIL SERVER TIME REACHES TARGET
+// =========================================================
 
 const waitUntil = async (targetTime) => {
   while (true) {
