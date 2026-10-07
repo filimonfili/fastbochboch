@@ -5,18 +5,27 @@ import { getIO } from "../socket/index.js";
 
 const router = express.Router();
 
+const MIN_BOOKED_SLOTS = 3;
+const GAME_DURATION_SECONDS = 40;
+
 router.post("/", requireAuth, async (req, res) => {
   try {
     const { gameId, slotNumbers } = req.body;
 
-    // Validate game ID
+    // ==========================================
+    // VALIDATE GAME ID
+    // ==========================================
+
     if (!gameId) {
       return res.status(400).json({
         message: "gameId is required",
       });
     }
 
-    // Validate slot array
+    // ==========================================
+    // VALIDATE SLOT ARRAY
+    // ==========================================
+
     if (!Array.isArray(slotNumbers) || slotNumbers.length === 0) {
       return res.status(400).json({
         message: "slotNumbers must be a non-empty array",
@@ -40,12 +49,45 @@ router.post("/", requireAuth, async (req, res) => {
       });
     }
 
-    // Prevent duplicate slots
+    // ==========================================
+    // PREVENT DUPLICATE SLOTS
+    // ==========================================
+
     const uniqueSlots = [...new Set(slots)];
 
     if (uniqueSlots.length !== slots.length) {
       return res.status(400).json({
         message: "Duplicate slots are not allowed",
+      });
+    }
+
+    // ==========================================
+    // GET GAME
+    // ==========================================
+
+    const { data: currentGame, error: currentGameError } = await supabase
+      .from("games")
+      .select(
+        "id, game_number, status, total_slots, slot_price, countdown_started_at, draw_at",
+      )
+      .eq("id", gameId)
+      .single();
+
+    if (currentGameError || !currentGame) {
+      console.error("Failed to get game before booking:", currentGameError);
+
+      return res.status(404).json({
+        message: "Game not found",
+      });
+    }
+
+    // ==========================================
+    // ONLY WAITING AND LIVE GAMES CAN BE BOOKED
+    // ==========================================
+
+    if (!["WAITING", "LIVE"].includes(currentGame.status)) {
+      return res.status(400).json({
+        message: "This game is no longer accepting bookings",
       });
     }
 
@@ -68,31 +110,17 @@ router.post("/", requireAuth, async (req, res) => {
     }
 
     // ==========================================
-    // GET UPDATED GAME TOTALS
+    // COUNT CONFIRMED BOOKED SLOTS
     // ==========================================
 
-    const { data: game, error: gameError } = await supabase
-      .from("games")
-      .select("id, total_slots, slot_price")
-      .eq("id", gameId)
-      .single();
-
-    if (gameError || !game) {
-      console.error("Failed to get game after booking:", gameError);
-
-      return res.status(500).json({
-        message: "Slots were booked, but failed to get updated game state",
-      });
-    }
-
-    // Count all booked slots for this game
     const { count: soldSlots, error: countError } = await supabase
       .from("bookings")
       .select("id", {
         count: "exact",
         head: true,
       })
-      .eq("game_id", gameId);
+      .eq("game_id", gameId)
+      .eq("status", "CONFIRMED");
 
     if (countError) {
       console.error("Failed to count sold slots:", countError);
@@ -108,7 +136,88 @@ router.post("/", requireAuth, async (req, res) => {
     const totalPrize = totalSoldSlots * 16;
 
     // ==========================================
-    // SOCKET: BROADCAST UPDATED GAME STATE
+    // START COUNTDOWN WHEN 3 SLOTS ARE BOOKED
+    // ==========================================
+
+    let gameStarted = false;
+    let countdownStartedAt = currentGame.countdown_started_at;
+    let drawAt = currentGame.draw_at;
+
+    if (
+      currentGame.status === "WAITING" &&
+      totalSoldSlots >= MIN_BOOKED_SLOTS
+    ) {
+      const startTime = new Date();
+
+      const newDrawAt = new Date(
+        startTime.getTime() + GAME_DURATION_SECONDS * 1000,
+      );
+
+      // IMPORTANT:
+      // Only one request can successfully change
+      // WAITING → LIVE.
+      //
+      // This protects us if multiple players book
+      // at almost exactly the same time.
+
+      const { data: startedGame, error: startError } = await supabase
+        .from("games")
+        .update({
+          status: "LIVE",
+          countdown_started_at: startTime.toISOString(),
+          draw_at: newDrawAt.toISOString(),
+        })
+        .eq("id", gameId)
+        .eq("status", "WAITING")
+        .select("id, game_number, status, countdown_started_at, draw_at")
+        .maybeSingle();
+
+      if (startError) {
+        console.error("Failed to start game countdown:", startError);
+
+        return res.status(500).json({
+          message: "Slots were booked, but failed to start the game",
+        });
+      }
+
+      // Only the request that actually changed
+      // WAITING → LIVE gets to broadcast game:start.
+      if (startedGame) {
+        gameStarted = true;
+
+        countdownStartedAt = startedGame.countdown_started_at;
+
+        drawAt = startedGame.draw_at;
+
+        const io = getIO();
+
+        io.to(`game:${gameId}`).emit("game:start", {
+          gameId: startedGame.id,
+          gameNumber: startedGame.game_number,
+
+          status: "LIVE",
+
+          countdownStartedAt,
+          drawAt,
+
+          serverTime: new Date().toISOString(),
+        });
+
+        console.log(
+          `🔥 Game #${startedGame.game_number} started — ${totalSoldSlots} slots booked`,
+        );
+
+        console.log("🔥 GAME START EVENT EMITTED:", {
+          gameId,
+          gameNumber: startedGame.game_number,
+          countdownStartedAt,
+          drawAt,
+        });
+      }
+    }
+
+    // ==========================================
+    // SOCKET: BROADCAST BOOKED SLOTS
     // ==========================================
 
     const io = getIO();
@@ -118,6 +227,11 @@ router.post("/", requireAuth, async (req, res) => {
       slotNumbers: uniqueSlots,
       soldSlots: totalSoldSlots,
       totalPrize,
+
+      status: gameStarted ? "LIVE" : currentGame.status,
+
+      countdownStartedAt,
+      drawAt,
     });
 
     console.log("🔥 SLOT BOOKED EVENT EMITTED:", {
@@ -125,6 +239,7 @@ router.post("/", requireAuth, async (req, res) => {
       slotNumbers: uniqueSlots,
       soldSlots: totalSoldSlots,
       totalPrize,
+      status: gameStarted ? "LIVE" : currentGame.status,
     });
 
     // ==========================================
@@ -133,9 +248,16 @@ router.post("/", requireAuth, async (req, res) => {
 
     return res.status(201).json({
       message: "Slots booked successfully",
+
       booking: data,
+
       soldSlots: totalSoldSlots,
       totalPrize,
+
+      status: gameStarted ? "LIVE" : currentGame.status,
+
+      countdownStartedAt,
+      drawAt,
     });
   } catch (error) {
     console.error("Create booking error:", error);

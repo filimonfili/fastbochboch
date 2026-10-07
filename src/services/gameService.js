@@ -1,6 +1,5 @@
 import supabase from "../config/supabase.js";
 
-const GAME_DURATION_SECONDS = 40;
 const TOTAL_SLOTS = 400;
 const SLOT_PRICE = 20;
 
@@ -14,18 +13,23 @@ export const createGame = async () => {
     return existingGame;
   }
 
-  const now = new Date();
-
-  const drawAt = new Date(now.getTime() + GAME_DURATION_SECONDS * 1000);
+  // =========================================================
+  // CREATE GAME IN WAITING STATE
+  // =========================================================
+  //
+  // The 40-second countdown does NOT start here.
+  //
+  // Countdown starts only when 3 slots have been confirmed.
+  // =========================================================
 
   const { data: game, error: gameError } = await supabase
     .from("games")
     .insert({
       total_slots: TOTAL_SLOTS,
       slot_price: SLOT_PRICE,
-      status: "LIVE",
-      countdown_started_at: now.toISOString(),
-      draw_at: drawAt.toISOString(),
+      status: "WAITING",
+      countdown_started_at: null,
+      draw_at: null,
     })
     .select()
     .single();
@@ -46,6 +50,10 @@ export const createGame = async () => {
     throw gameError;
   }
 
+  // =========================================================
+  // CREATE 400 SLOTS
+  // =========================================================
+
   const slots = Array.from({ length: TOTAL_SLOTS }, (_, index) => ({
     game_id: game.id,
     slot_number: index + 1,
@@ -60,18 +68,24 @@ export const createGame = async () => {
   }
 
   console.log(
-    `Game #${game.game_number} created — draw in ${GAME_DURATION_SECONDS}s`,
+    `Game #${game.game_number} created — WAITING for 3 booked slots.`,
   );
 
   return game;
 };
 
+// =========================================================
+// GET ACTIVE GAME
+// =========================================================
+
 export const getActiveGame = async () => {
   const { data: game, error } = await supabase
     .from("games")
     .select("*")
-    .in("status", ["LIVE", "DRAWING"])
-    .order("created_at", { ascending: false })
+    .in("status", ["WAITING", "LIVE", "DRAWING"])
+    .order("created_at", {
+      ascending: false,
+    })
     .limit(1)
     .maybeSingle();
 
@@ -82,11 +96,17 @@ export const getActiveGame = async () => {
   return game;
 };
 
+// =========================================================
+// GET OR CREATE ACTIVE GAME
+// =========================================================
+
 export const getOrCreateActiveGame = async () => {
   const existingGame = await getActiveGame();
 
   if (existingGame) {
-    console.log(`Active game found: #${existingGame.game_number}`);
+    console.log(
+      `Active game found: #${existingGame.game_number} (${existingGame.status})`,
+    );
 
     return existingGame;
   }
