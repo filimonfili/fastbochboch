@@ -48,7 +48,7 @@ router.get("/current", requireAuth, async (req, res) => {
     const { data: game, error: gameError } = await supabase
       .from("games")
       .select("*")
-      .in("status", ["LIVE", "DRAWING"])
+      .in("status", ["WAITING", "LIVE", "DRAWING"])
       .order("created_at", {
         ascending: false,
       })
@@ -80,7 +80,9 @@ router.get("/current", requireAuth, async (req, res) => {
 
     res.json({
       game,
+
       soldSlots: count || 0,
+
       remainingSlots: game.total_slots - (count || 0),
     });
   } catch (error) {
@@ -101,7 +103,7 @@ router.get("/current/slots", requireAuth, async (req, res) => {
     const { data: game, error: gameError } = await supabase
       .from("games")
       .select("id")
-      .in("status", ["LIVE", "DRAWING"])
+      .in("status", ["WAITING", "LIVE", "DRAWING"])
       .order("created_at", {
         ascending: false,
       })
@@ -291,9 +293,10 @@ router.get("/current-draw", requireAuth, async (req, res) => {
        * Try to get the winner.
        *
        * Normally the winner may not exist during
-       * the first 5 seconds because drawGame() has
-       * not completed yet.
+       * the first 5 seconds because drawGame()
+       * has not completed yet.
        */
+
       const { data: winner, error: winnerError } = await supabase
         .from("winners")
         .select("slot_number, prize_amount, user_id")
@@ -339,6 +342,7 @@ router.get("/current-draw", requireAuth, async (req, res) => {
      *
      * We only look back 20 seconds.
      */
+
     const recoveryWindowStart = new Date(
       Date.now() - DRAW_PRESENTATION_DURATION_MS,
     ).toISOString();
@@ -384,6 +388,7 @@ router.get("/current-draw", requireAuth, async (req, res) => {
      * The 20-second draw presentation
      * has already finished.
      */
+
     if (now >= resultEndsAt) {
       return res.json({
         active: false,
