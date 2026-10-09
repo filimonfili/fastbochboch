@@ -32,11 +32,11 @@ export const sendMainMenu = async (bot, chatId) => {
 
   await bot.sendMessage(
     chatId,
-    `🤖 Fast Boch Boch
+    `🤖 ቦጭ ቦጭ
 
-Welcome! Choose an option below 👇
+እንኳን ደህና መጡ! ከዚህ በታች ካሉት አማራጮች አንዱን ይምረጡ።👇
 
-🎮 To play, use /playnow`,
+🎮 ለመጫወት, /playnow ይጠቀሙ`,
     {
       reply_markup: mainMenuKeyboard,
     },
@@ -61,7 +61,7 @@ Ready to play?`,
         inline_keyboard: [
           [
             {
-              text: "🎮 Play Boch Boch",
+              text: "🎮 ቦጭ ቦጭን ይጫወቱ",
               web_app: {
                 url: miniAppUrl,
               },
@@ -89,9 +89,9 @@ export const sendBalanceMessage = async (bot, chatId) => {
       if (userError.code === "PGRST116") {
         await bot.sendMessage(
           chatId,
-          `❌ Your account could not be found.
+          `❌ መለያዎ ሊገኝ አልቻለም።
 
-Please use /start first.`,
+እባክዎ በመጀመሪያ /start የሚለውን ይጠቀሙ።`,
         );
         return;
       }
@@ -109,16 +109,15 @@ Please use /start first.`,
       if (walletError.code === "PGRST116") {
         await bot.sendMessage(
           chatId,
-          `💰 Balance
-
-Available Balance:
-0 ETB`,
+          `💰 ቀሪ ሂሳብ
+ቀሪ ሂሳብ፡
+0 ብር`,
           {
             reply_markup: {
               inline_keyboard: [
                 [
                   {
-                    text: "🎮 Play Boch Boch",
+                    text: "🎮 ቦጭ ቦጭን ይጫወቱ ",
                     web_app: {
                       url: miniAppUrl,
                     },
@@ -139,16 +138,16 @@ Available Balance:
 
     await bot.sendMessage(
       chatId,
-      `💰 Balance
+      `💰 ቀሪ ሂሳብ
 
-Available Balance:
-${balance.toLocaleString()} ETB`,
+ሊጠቀምበት የሚቻል ቀሪ ሂሳብ፡
+${balance.toLocaleString()} ብር`,
       {
         reply_markup: {
           inline_keyboard: [
             [
               {
-                text: "🎮 Play Boch Boch",
+                text: "🎮 ቦጭ ቦጭን ይጫወቱ ",
                 web_app: {
                   url: miniAppUrl,
                 },
@@ -163,9 +162,9 @@ ${balance.toLocaleString()} ETB`,
 
     await bot.sendMessage(
       chatId,
-      `❌ Unable to check your balance right now.
+      `❌ በአሁኑ ወቅት ቀሪ ሂሳብዎን ማረጋገጥ አልተቻለም።
 
-Please try again.`,
+እባክዎ እንደገና ይሞክሩ።`,
     );
   }
 };
@@ -177,15 +176,15 @@ Please try again.`,
 export const sendWithdrawMessage = async (bot, chatId) => {
   await bot.sendMessage(
     chatId,
-    `💸 Withdraw
+    `💸 ማውጣት
 
-Withdrawal options will be available here.`,
+ገንዘብ የማውጣት አማራጮች እዚህ ይገኛሉ።`,
     {
       reply_markup: {
         inline_keyboard: [
           [
             {
-              text: "🎮 Play Boch Boch",
+              text: "🎮 ቦጭ ቦጭን ይጫወቱ",
               web_app: {
                 url: miniAppUrl,
               },
