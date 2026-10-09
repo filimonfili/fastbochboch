@@ -5,9 +5,9 @@ export const registerSupportCommand = (bot) => {
 
       await bot.sendMessage(
         chatId,
-        `🆘 Support
+        `🆘 ድጋፍ
 
-If you have a problem with your account, deposit, withdrawal, or game, please contact @enon28.`,
+በመለያዎ፣ በተቀማጭ ገንዘብ፣ ገንዘብ በማውጣት ወይም በጨዋታ ላይ ችግር ካጋጠመዎት፣ እባክዎ @enon28 ን ያግኙ።`,
       );
 
       console.log("🆘 /support:", chatId);

@@ -456,32 +456,32 @@ Please try again.`,
       // PLAYER MENU BUTTONS
       // =========================================================
 
-      if (text === "🎮 Play Boch Boch") {
+      if (text === "🎮 ቦጭ ቦጭን ይጫወቱ") {
         await sendMainMenu(bot, chatId);
         return;
       }
 
-      if (text === "💰 Balance") {
+      if (text === "💰 ቀሪ ሂሳብ") {
         await sendBalanceMessage(bot, chatId);
         return;
       }
 
-      if (text === "➕ Deposit") {
+      if (text === "➕ ተቀማጭ ገንዘብ") {
         await sendPaymentMethods(bot, chatId);
         return;
       }
 
-      if (text === "💸 Withdraw") {
+      if (text === "💸 ማውጣት") {
         await startWithdrawal(bot, msg);
         return;
       }
 
-      if (text === "🆘 Support") {
+      if (text === "🆘 አገልግሎት") {
         await bot.sendMessage(
           chatId,
-          `🆘 Support
+          `🆘 አገልግሎት
 
-If you have a problem with your account, deposit, withdrawal, or game, please contact @enon28.`,
+በመለያዎ፣ በተቀማጭ ገንዘብ፣ ገንዘብ በማውጣት ወይም በጨዋታ ላይ ችግር ካጋጠመዎት፣ እባክዎ በ @enon28 ያግኙን።`,
         );
 
         return;
@@ -497,7 +497,7 @@ If you have a problem with your account, deposit, withdrawal, or game, please co
         if (text === "/cancel") {
           withdrawalSessions.delete(chatId);
 
-          await bot.sendMessage(chatId, "❌ Withdrawal cancelled.");
+          await bot.sendMessage(chatId, "❌ የገንዘብ ማውጣት ሂደቱ ተሰርዟል።");
 
           return;
         }
@@ -512,12 +512,11 @@ If you have a problem with your account, deposit, withdrawal, or game, please co
           if (!Number.isInteger(amount) || amount <= 0) {
             await bot.sendMessage(
               chatId,
-              `❌ Invalid amount.
+              `❌ ልክ ያልሆነ መጠን።
 
-Please enter a valid whole number.
+እባክዎ ትክክለኛ ሙሉ ቁጥር ያስገቡ።
 
-Example:
-
+ለምሳሌ፡
 100`,
             );
 
@@ -529,9 +528,9 @@ Example:
           if (amount < MIN_WITHDRAWAL) {
             await bot.sendMessage(
               chatId,
-              `❌ Minimum withdrawal is ${MIN_WITHDRAWAL} ETB.
+              `❌ ዝቅተኛው የማውጣት መጠን ${MIN_WITHDRAWAL} ETB ነው።
 
-Please enter an amount of ${MIN_WITHDRAWAL} ETB or more.`,
+እባክዎ ${MIN_WITHDRAWAL} ብር ወይም ከዚያ በላይ የሆነ መጠን ያስገቡ።.`,
             );
 
             return;
@@ -542,15 +541,15 @@ Please enter an amount of ${MIN_WITHDRAWAL} ETB or more.`,
           if (amount > currentBalance) {
             await bot.sendMessage(
               chatId,
-              `❌ Insufficient Balance
+              `❌ በቂ ቀሪ ሂሳብ የለም
 
-Your balance:
-${currentBalance} ETB
+የእርስዎ ቀሪ ሂሳብ፡
+${currentBalance} ብር
 
-Requested:
-${amount} ETB
+የተጠየቀው፡
+${amount} ብር
 
-Please enter an amount up to ${currentBalance} ETB.`,
+እባክዎ እስከ ${currentBalance} ብር የሚደርስ መጠን ያስገቡ።`,
             );
 
             return;
@@ -563,24 +562,22 @@ Please enter an amount up to ${currentBalance} ETB.`,
           });
 
           const paymentName =
-            withdrawalSession.paymentMethod === "TELEBIRR"
-              ? "Telebirr"
-              : "CBE Birr";
+            withdrawalSession.paymentMethod === "TELEBIRR" ? "ቴሌብር" : "CBE ብር";
 
           await bot.sendMessage(
             chatId,
-            `📱 ${paymentName} Withdrawal
+            `📱 ${paymentName} ገንዘብ ማውጣት
 
-💰 Amount:
-${amount} ETB
+💰 መጠኑ፦
+${amount} ብር
 
-Now enter the ${paymentName} phone number where you want to receive the money.
+አሁን ገንዘቡን መቀበል የሚፈልጉበትን የ ${paymentName} ስልክ ቁጥር ያስገቡ።
 
-Example:
+ምሳሌ፦
 
 0912345678
 
-Send /cancel to cancel.`,
+ለመሰረዝ cancel ብለው ይላኩ።`,
           );
 
           return;
@@ -596,11 +593,11 @@ Send /cancel to cancel.`,
           if (!/^09\d{8}$/.test(accountNumber)) {
             await bot.sendMessage(
               chatId,
-              `❌ Invalid phone number.
+              `❌ ልክ ያልሆነ የስልክ ቁጥር።
 
-Please enter a valid Ethiopian mobile number.
+እባክዎ ትክክለኛ የሞባይል ስልክ ቁጥር ያስገቡ።
 
-Example:
+ምሳሌ፦
 
 0912345678`,
             );
@@ -611,42 +608,40 @@ Example:
           withdrawalSessions.set(chatId, {
             ...withdrawalSession,
             accountNumber,
-            step: "CONFIRM",
+            step: "አረጋግጥ",
           });
 
           const paymentName =
-            withdrawalSession.paymentMethod === "TELEBIRR"
-              ? "Telebirr"
-              : "CBE Birr";
+            withdrawalSession.paymentMethod === "TELEBIRR" ? "ቴሌብር" : "CBE ብር";
 
           await bot.sendMessage(
             chatId,
-            `🔎 Confirm Withdrawal
+            `🔎 የገንዘብ ማውጣትን ያረጋግጡ
 
-💰 Amount:
-${withdrawalSession.amount} ETB
+💰 መጠኑ፡
+${withdrawalSession.amount} ብር
 
-📱 Method:
+📱 ዘዴው፡
 ${paymentName}
 
-📞 Number:
+📞 ቁጥሩ፡
 ${accountNumber}
 
-Please check the information carefully.
+እባክዎ መረጃውን በጥንቃቄ ያረጋግጡ።
 
-Do you want to continue?`,
+መቀጠል ይፈልጋሉ?`,
             {
               reply_markup: {
                 inline_keyboard: [
                   [
                     {
-                      text: "✅ Confirm Withdrawal",
+                      text: "✅ ማውጣትን ያረጋግጡ",
                       callback_data: "withdraw_confirm",
                     },
                   ],
                   [
                     {
-                      text: "❌ Cancel",
+                      text: "❌ ሰርዝ",
                       callback_data: "withdraw_cancel",
                     },
                   ],
@@ -678,7 +673,7 @@ Do you want to continue?`,
       if (text === "/cancel") {
         depositSessions.delete(chatId);
 
-        await bot.sendMessage(chatId, "❌ Deposit cancelled.");
+        await bot.sendMessage(chatId, "❌ ገንዘብ ማስገባት ተሰርዟል");
 
         await sendPaymentMethods(bot, chatId);
 
@@ -689,11 +684,11 @@ Do you want to continue?`,
       // ONLY PROCESS TELEBIRR DEPOSIT
       // ---------------------------------------------------------
 
-      if (depositSession.paymentMethod !== "TELEBIRR") {
+      if (depositSession.paymentMethod !== "ቴሌብር") {
         return;
       }
 
-      console.log("💰 Deposit submission received:", {
+      console.log("💰 ገንዘቡ ተልካል", {
         chatId,
         telegramId,
         text,
@@ -705,11 +700,11 @@ Do you want to continue?`,
 
       const result = await createPendingDeposit({
         telegramId,
-        paymentMethod: "TELEBIRR",
+        paymentMethod: "ቴሌብር",
         playerMessage: text,
       });
 
-      console.log("💰 Deposit result:", result);
+      console.log("💰 ገንዘብ ማስገባት ውጤት:", result);
 
       // =========================================================
       // READ VERIFICATION RESULT
@@ -717,7 +712,7 @@ Do you want to continue?`,
 
       const status = result?.verification?.reason;
 
-      console.log("💰 Deposit verification status:", status);
+      console.log("💰 የተቀማጭ ገንዘብ ማረጋገጫ ሁኔታ:", status);
 
       // =========================================================
       // DEPOSIT APPROVED
@@ -730,21 +725,21 @@ Do you want to continue?`,
 
         await bot.sendMessage(
           chatId,
-          `✅ Deposit Successful!
+          `✅ የገንዘብ ማስገባት ፕሮሰስ ተሳክቷል!
 
-💰 Amount:
+💰 መጠኑ:
 
-${amount.toLocaleString()} ETB
+${amount.toLocaleString()} ብር
 
-Your wallet has been credited successfully.
+የእርስዎ ዋሌት በተሳካ ሁኔታ ተሞልቷል።
 
-🎮 You can now play Boch Boch.`,
+🎮 አሁን ቦጭ ቦጭን መጫወት ይችላሉ።`,
           {
             reply_markup: {
               inline_keyboard: [
                 [
                   {
-                    text: "🎮 Play Boch Boch",
+                    text: "🎮 ቦጭ ቦጭን ይጫወቱ",
                     web_app: {
                       url: process.env.TELEGRAM_MINI_APP_URL,
                     },
@@ -765,15 +760,15 @@ Your wallet has been credited successfully.
       if (status === "WAITING_FOR_MERCHANT") {
         await bot.sendMessage(
           chatId,
-          `⏳ Deposit Received
+          `⏳ ገንዘብ ተቀምጧል
 
-Your payment confirmation was received.
+የክፍያ ማረጋገጫዎ ደርሶናል።
 
-We are waiting for the merchant payment confirmation.
+ከአድሚን የሚጠበቀውን የክፍያ ማረጋገጫ በመጠባበቅ ላይ እንገኛለን።
 
-Your wallet will be credited automatically once the payment is verified.
+ክፍያው ሲረጋገጥ ዋሌቶን አዉቶማቲክ ይሞላል።
 
-Please do not submit the same payment again.`,
+እባክዎ ተመሳሳይ ክፍያ በድጋሚ አያስገቡ።`,
         );
 
         return;
@@ -788,9 +783,9 @@ Please do not submit the same payment again.`,
 
         await bot.sendMessage(
           chatId,
-          `⚠️ This transaction has already been processed.
+          `⚠️ ይህ ግብይት ቀድሞውኑ ተከናውኗል።
 
-If you believe this is an error, please contact support.`,
+ይህ ስህተት ነው ብለው ካመኑ፣ እባክዎ የድጋፍ አገልግሎቱን ያግኙ።`,
         );
 
         return;
@@ -803,11 +798,11 @@ If you believe this is an error, please contact support.`,
       if (status === "WAITING_FOR_PLAYER") {
         await bot.sendMessage(
           chatId,
-          `⏳ Payment Found
+          `⏳ ክፍያ ተገኝቷል
 
-The merchant payment was found, but we still need your payment confirmation.
+የተጫዋች ክፍያ ተገኝቷል፤ ነገር ግን አሁንም የክፍያ ማረጋገጫዎ ያስፈልገናል።
 
-Please send your Telebirr SMS or FT reference number.`,
+እባክዎ የቴሌብር የኤስኤምኤስ መልእክት ወይም የFT ማጣቀሻ ቁጥር ይላኩልን።`,
         );
 
         return;
@@ -820,11 +815,11 @@ Please send your Telebirr SMS or FT reference number.`,
       if (status === "DUPLICATE" || status === "ALREADY_PENDING") {
         await bot.sendMessage(
           chatId,
-          `⚠️ This transaction is already being processed.
+          `⚠️ ይህ ግብይት ቀድሞውኑ ተከናውኗል።
 
-Please wait for verification.
+እባክዎ ለማረጋገጫ ይጠብቁ።
 
-Do not submit the same FT reference again.`,
+ተመሳሳይ የFT ማጣቀሻ (reference) ቁጥር ​​እንደገና አያስገቡ።`,
         );
 
         return;
@@ -834,18 +829,18 @@ Do not submit the same FT reference again.`,
       // UNKNOWN RESULT
       // =========================================================
 
-      console.error("❌ Unknown deposit verification status:", {
+      console.error("❌ ያልታወቀ የተቀማጭ ገንዘብ ማረጋገጫ ሁኔታ፡-", {
         status,
         result,
       });
 
       await bot.sendMessage(
         chatId,
-        `⏳ Deposit Received
+        `⏳ ተቀማጭ ገንዘብ ደርሷል
 
-Your payment is being verified.
+ክፍያዎ እየተረጋገጠ ነው።
 
-Please wait for confirmation before submitting again.`,
+እንደገና ከማስገባትዎ በፊት የማረጋገጫ መልእክት ይጠብቁ።`,
       );
     } catch (error) {
       console.error("❌ Message handler error:", error);
@@ -853,9 +848,9 @@ Please wait for confirmation before submitting again.`,
       try {
         await bot.sendMessage(
           msg.chat.id,
-          `❌ Something went wrong.
+          `❌ ችግር ተፈጥሯል።
 
-Please try again or contact support.`,
+እባክዎ እንደገና ይሞክሩ ወይም የድጋፍ አገልግሎትን ያግኙ።`,
         );
       } catch (sendError) {
         console.error("❌ Failed to send error message:", sendError);

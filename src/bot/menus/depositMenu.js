@@ -7,15 +7,15 @@
 export const sendPaymentMethods = async (bot, chatId) => {
   await bot.sendMessage(
     chatId,
-    `💰 Deposit
+    `💰 ተቀማጭ ገንዘብ
 
-Choose your payment method 👇`,
+የክፍያ ዘዴዎን ይምረጡ 👇`,
     {
       reply_markup: {
         inline_keyboard: [
           [
             {
-              text: "📱 Telebirr",
+              text: "📱 ቴሌብር",
               callback_data: "deposit_telebirr",
             },
           ],

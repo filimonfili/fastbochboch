@@ -11,18 +11,18 @@ export const sendMainMenu = async (bot, chatId) => {
     keyboard: [
       [
         {
-          text: "💰 Balance",
+          text: "💰 ቀሪ ሂሳብ",
         },
         {
-          text: "➕ Deposit",
+          text: "➕ ገንዘብ ማስገባት",
         },
       ],
       [
         {
-          text: "💸 Withdraw",
+          text: "💸 ገንዘብ ማውጣት",
         },
         {
-          text: "🆘 Support",
+          text: "🆘 ድጋፍ",
         },
       ],
     ],
@@ -53,9 +53,9 @@ export const sendPlayMessage = async (bot, chatId) => {
 
   await bot.sendMessage(
     chatId,
-    `🎮 Fast Boch Boch
+    `🎮 ቦጭ ቦጭ
 
-Ready to play?`,
+ለመጫወት ዝግጁ ነዎት?`,
     {
       reply_markup: {
         inline_keyboard: [

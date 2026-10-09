@@ -14,10 +14,7 @@ export const startWithdrawal = async (bot, msg) => {
 
   try {
     if (!telegramId) {
-      await bot.sendMessage(
-        chatId,
-        "❌ Unable to identify your Telegram account.",
-      );
+      await bot.sendMessage(chatId, "❌ የእርስዎን የቴሌግራም አካውንት መለየት አልተቻለም።");
 
       return;
     }
@@ -35,7 +32,7 @@ export const startWithdrawal = async (bot, msg) => {
     if (userError || !user) {
       console.error("❌ Withdrawal user lookup failed:", userError);
 
-      await bot.sendMessage(chatId, "❌ Your account could not be found.");
+      await bot.sendMessage(chatId, "❌ መለያዎ ሊገኝ አልቻለም።");
 
       return;
     }
@@ -59,13 +56,13 @@ export const startWithdrawal = async (bot, msg) => {
     if (balance <= 0) {
       await bot.sendMessage(
         chatId,
-        `💸 Withdraw
+        `💸 ገንዘብ ማውጣት
 
-❌ No money in your account.
+❌ በሂሳብዎ ውስጥ ገንዘብ የለም።
 
-Your current balance is 0 ETB.
+የአሁኑ ቀሪ ሂሳብዎ 0 ETB ነው።
 
-Please deposit money or win a game before withdrawing.`,
+እባክዎ ገንዘብ ከማውጣትዎ በፊት ገንዘብ ያስገቡ ወይም ጨዋታ ያሸንፉ።`,
       );
 
       return;
@@ -88,29 +85,29 @@ Please deposit money or win a game before withdrawing.`,
 
     await bot.sendMessage(
       chatId,
-      `💸 Withdraw
+      `💸 ገንዘብ ያውጡ
 
-💰 Available Balance: ${balance} ETB
+💰 የሚገኝ ቀሪ ሂሳብ፡ ${balance} ብር
 
-Choose your withdrawal method 👇`,
+የማውጣት ዘዴዎን ይምረጡ 👇`,
       {
         reply_markup: {
           inline_keyboard: [
             [
               {
-                text: "📱 Telebirr",
+                text: "📱 ቴሌብር",
                 callback_data: "withdraw_telebirr",
               },
             ],
             [
               {
-                text: "🏦 CBE Birr",
+                text: "🏦 CBE ብር",
                 callback_data: "withdraw_cbe_birr",
               },
             ],
             [
               {
-                text: "❌ Cancel",
+                text: "❌ ሰርዝ",
                 callback_data: "withdraw_cancel",
               },
             ],
@@ -121,10 +118,7 @@ Choose your withdrawal method 👇`,
   } catch (error) {
     console.error("❌ Start withdrawal error:", error);
 
-    await bot.sendMessage(
-      chatId,
-      "❌ Something went wrong while starting your withdrawal.",
-    );
+    await bot.sendMessage(chatId, "❌ ገንዘብ የማውጣት ሂደቱን ሲጀምሩ ችግር አጋጥሟል።");
   }
 };
 

@@ -15,7 +15,7 @@ export const registerBalanceCommand = (bot) => {
       try {
         await bot.sendMessage(
           msg.chat.id,
-          "❌ Unable to check your balance right now.",
+          "❌ በአሁኑ ወቅት ቀሪ ሂሳብዎን ማረጋገጥ አልተቻለም።",
         );
       } catch (sendError) {
         console.error("❌ Failed to send balance error:", sendError);
