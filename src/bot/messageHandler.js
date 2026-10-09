@@ -456,34 +456,38 @@ Please try again.`,
       // PLAYER MENU BUTTONS
       // =========================================================
 
-      if (text === "🎮 ቦጭ ቦጭን ይጫወቱ") {
+      // PLAY
+      if (text === "🎮 ቦጭ ቦጭን ይጫወቱ" || text === "🎮 ለመጫወት") {
         await sendMainMenu(bot, chatId);
         return;
       }
 
-      if (text === "💰 ቀሪ ሂሳብ") {
+      // BALANCE
+      if (text === "💰 ቀሪ ሂሳብ" || text === "💰 Balance") {
         await sendBalanceMessage(bot, chatId);
         return;
       }
 
-      if (text === "➕ ተቀማጭ ገንዘብ") {
+      // DEPOSIT
+      if (text === "➕ ገንዘብ ማስገባት" || text === "➕ ተቀማጭ ገንዘብ") {
         await sendPaymentMethods(bot, chatId);
         return;
       }
 
-      if (text === "💸 ማውጣት") {
+      // WITHDRAW
+      if (text === "💸 ገንዘብ ማውጣት" || text === "💸 ማውጣት") {
         await startWithdrawal(bot, msg);
         return;
       }
 
-      if (text === "🆘 አገልግሎት") {
+      // SUPPORT
+      if (text === "🆘 ድጋፍ" || text === "🆘 አገልግሎት") {
         await bot.sendMessage(
           chatId,
-          `🆘 አገልግሎት
+          `🆘 ድጋፍ
 
 በመለያዎ፣ በተቀማጭ ገንዘብ፣ ገንዘብ በማውጣት ወይም በጨዋታ ላይ ችግር ካጋጠመዎት፣ እባክዎ በ @enon28 ያግኙን።`,
         );
-
         return;
       }
 
