@@ -5,7 +5,7 @@ import { requireAuth } from "../middleware/authMiddleware.js";
 const router = express.Router();
 
 const SHAKE_DURATION_MS = 5 * 1000;
-const REVEAL_DURATION_MS = 5 * 1000;
+const REVEAL_DURATION_MS = 3 * 1000;
 const RESULT_DURATION_MS = 10 * 1000;
 
 const DRAW_PRESENTATION_DURATION_MS =
