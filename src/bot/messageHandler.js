@@ -470,13 +470,39 @@ Please try again.`,
 
       // DEPOSIT
       if (text === "➕ ገንዘብ ማስገባት" || text === "➕ ተቀማጭ ገንዘብ") {
-        await sendPaymentMethods(bot, chatId);
+        console.log("✅ DEPOSIT HANDLER MATCHED");
+
+        try {
+          console.log("➡️ Calling sendPaymentMethods");
+          await sendPaymentMethods(bot, chatId);
+          console.log("✅ sendPaymentMethods completed");
+        } catch (error) {
+          console.error("❌ DEPOSIT HANDLER ERROR:", error);
+          await bot.sendMessage(
+            chatId,
+            "Deposit error. Please contact support.",
+          );
+        }
+
         return;
       }
 
       // WITHDRAW
       if (text === "💸 ገንዘብ ማውጣት" || text === "💸 ማውጣት") {
-        await startWithdrawal(bot, msg);
+        console.log("✅ WITHDRAW HANDLER MATCHED");
+
+        try {
+          console.log("➡️ Calling startWithdrawal");
+          await startWithdrawal(bot, msg);
+          console.log("✅ startWithdrawal completed");
+        } catch (error) {
+          console.error("❌ WITHDRAW HANDLER ERROR:", error);
+          await bot.sendMessage(
+            chatId,
+            "Withdrawal error. Please contact support.",
+          );
+        }
+
         return;
       }
 
