@@ -32,7 +32,7 @@ export const registerWithdrawalCallbacks = (bot) => {
       if (action === "withdraw_cancel") {
         withdrawalSessions.delete(chatId);
 
-        await bot.sendMessage(chatId, "❌ Withdrawal cancelled.");
+        await bot.sendMessage(chatId, "❌ የገንዘብ ማውጣት ሂደቱ ተሰርዟል።");
 
         return;
       }
@@ -48,7 +48,7 @@ export const registerWithdrawalCallbacks = (bot) => {
           chatId,
           `⚠️ Your withdrawal session has expired.
 
-Please press 💸 Withdraw again.`,
+Please press 💸 ገንዘብ ማውጣት again.`,
         );
 
         return;
@@ -61,24 +61,24 @@ Please press 💸 Withdraw again.`,
       if (action === "withdraw_telebirr") {
         withdrawalSessions.set(chatId, {
           ...session,
-          paymentMethod: "TELEBIRR",
+          paymentMethod: "ቴሌብር",
           step: "AMOUNT",
         });
 
         await bot.sendMessage(
           chatId,
-          `📱 Telebirr Withdrawal
+          `📱 ቴሌብር ማውጣት
 
-💰 Available Balance:
-${session.balance} ETB
+💰 ሊጠቀምበት የሚቻል ቀሪ ሂሳብ:
+${session.balance} ብር
 
-Enter the amount you want to withdraw.
+ማውጣት የሚፈልጉትን መጠን ያስገቡ።
 
-Example:
+ምሳሌ፦
 
 100
 
-Send /cancel to cancel.`,
+ለመሰረዝ /cancel ብለው ይላኩ።`,
         );
 
         return;
@@ -91,24 +91,24 @@ Send /cancel to cancel.`,
       if (action === "withdraw_cbe_birr") {
         withdrawalSessions.set(chatId, {
           ...session,
-          paymentMethod: "CBEBIRR",
+          paymentMethod: "CBE ብር",
           step: "AMOUNT",
         });
 
         await bot.sendMessage(
           chatId,
-          `🏦 CBE Birr Withdrawal
+          `🏦 የCBE Birr ገንዘብ ማውጣት
 
-💰 Available Balance:
-${session.balance} ETB
+💰 ሊጠቀምበት የሚቻል ቀሪ ሂሳብ:
+${session.balance} ብር
 
-Enter the amount you want to withdraw.
+ማውጣት የሚፈልጉትን መጠን ያስገቡ።
 
-Example:
+ምሳሌ፦
 
 100
 
-Send /cancel to cancel.`,
+ለመሰረዝ /cancel ብለው ይላኩ።`,
         );
 
         return;
@@ -134,9 +134,9 @@ Send /cancel to cancel.`,
 
           await bot.sendMessage(
             chatId,
-            `⚠️ Your withdrawal session is invalid or expired.
+            `⚠️ የገንዘብ ማውጣት ክፍለ-ጊዜዎ ትክክለኛ አይደለም ወይም ጊዜው አልፎበታል።
 
-Please start the withdrawal again.`,
+እባክዎ የገንዘብ ማውጣት ሂደቱን እንደገና ይጀምሩ።`,
           );
 
           return;
@@ -184,9 +184,9 @@ Please start the withdrawal again.`,
 
             await bot.sendMessage(
               chatId,
-              `❌ No money in your account.
+              `❌ በሂሳብዎ ውስጥ ገንዘብ የለም።
 
-Your withdrawal could not be submitted because your balance is 0 ETB.`,
+የሂሳብ ቀሪዎ 0 ብር ስለሆነ፣ ገንዘብ የማውጣት ጥያቄዎን ማስገባት አልተቻለም።`,
             );
 
             return;
@@ -201,11 +201,11 @@ Your withdrawal could not be submitted because your balance is 0 ETB.`,
 
             await bot.sendMessage(
               chatId,
-              `❌ Insufficient Balance
+              `❌ በቂ ቀሪ ሂሳብ የለም
 
-Your available balance is no longer enough for this withdrawal.
+ያለዎት ቀሪ ሂሳብ ለዚህ ገንዘብ ማውጣት በቂ አይደለም።
 
-Please start the withdrawal again.`,
+እባክዎ ገንዘብ የማውጣት ሂደቱን እንደገና ይጀምሩ።`,
             );
 
             return;
@@ -217,11 +217,11 @@ Please start the withdrawal again.`,
 
           await bot.sendMessage(
             chatId,
-            `❌ We couldn't submit your withdrawal.
+            `❌ የገንዘብ ማውጣት ጥያቄዎን ማስገባት አልቻልንም።
 
-Your money has not been withdrawn.
+ገንዘብዎ አልወጣም።
 
-Please try again.`,
+እባክዎ እንደገና ይሞክሩ።`,
           );
 
           return;
@@ -252,10 +252,10 @@ Please try again.`,
 
         await bot.sendMessage(
           chatId,
-          `✅ Withdrawal Request Submitted
+          `✅ የማውጣት ጥያቄ ቀርቧል
 
-💰 Amount:
-${session.amount} ETB
+💰 መጠን:
+${session.amount} ብር
 
 📱 Method:
 ${paymentName}
@@ -263,15 +263,15 @@ ${paymentName}
 📞 Number:
 ${session.accountNumber}
 
-⏳ Status:
-Pending
+⏳ ሁኔታ:
+በሂደት ላይ
 
 🆔 Request:
 ${withdrawalId}
 
-Your withdrawal request has been sent for processing.
+የገንዘብ ማውጣት ጥያቄዎ ለሂደት ተልኳል።
 
-Please wait for confirmation from the admin.`,
+እባክዎ ከአስተዳዳሪው የሚሰጠውን ማረጋገጫ ይጠብቁ።`,
         );
 
         console.log("✅ Withdrawal created successfully:", result);
@@ -282,10 +282,7 @@ Please wait for confirmation from the admin.`,
       console.error("❌ Withdrawal callback error:", error);
 
       try {
-        await bot.sendMessage(
-          chatId,
-          "❌ Something went wrong. Please try again.",
-        );
+        await bot.sendMessage(chatId, "❌ ችግር ተፈጥሯል። እባክዎ እንደገና ይሞክሩ።");
       } catch (sendError) {
         console.error("❌ Failed to send withdrawal error:", sendError);
       }

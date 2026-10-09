@@ -61,13 +61,13 @@ export const registerAnnouncementCallbacks = (bot) => {
 
         await bot.sendMessage(
           chatId,
-          `📢 Create Announcement
+          `📢 ማስታወቂያ ይፍጠሩ
 
-🖼️ First, send the banner image for the announcement.
+🖼️ በመጀመሪያ፣ ለማስታወቂያው የሚሆነውን ባነር ምስል ይላኩ።
 
-Please send it as a photo.
+እባክዎ እንደ ፎቶ ይላኩት።
 
-Send /cancel to cancel.`,
+ለመሰረዝ /cancel ብለው ይላኩ።`,
         );
 
         return;

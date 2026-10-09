@@ -15,7 +15,7 @@ export const registerDepositCallbacks = (bot, depositSessions) => {
 
       if (action === "deposit_telebirr") {
         depositSessions.set(chatId, {
-          paymentMethod: "TELEBIRR",
+          paymentMethod: "ቴሌብር",
         });
 
         const settings = await getTelebirrSettings();
@@ -24,9 +24,9 @@ export const registerDepositCallbacks = (bot, depositSessions) => {
 
         await bot.sendMessage(
           chatId,
-          `📱 Telebirr Deposit
+          `📱 ቴሌብር ገንዘብ ማስገባት
 
-Send your payment to:
+ክፍያዎን ወደዚህ ይላኩ:
 
 📞 ${settings.phone_number}
 
@@ -34,23 +34,23 @@ Send your payment to:
 
 ━━━━━━━━━━━━━━━
 
-📋 Deposit Steps
+📋 ገንዘብ ስያስገቡ የሚከተሉት ደረጃዎች ፡
 
-1️⃣ Send your payment to the account above.
+1️⃣ ክፍያዎን ከላይ ወዳለው ስልክ ቁጥር ይላኩ።
 
-2️⃣ After payment, Telebirr will send you an SMS.
+2️⃣ ክፍያውን ከፈጸሙ በኋላ፣ ቴሌብር (Telebirr) የጽሑፍ መልእክት (SMS) ይልክልዎታል።
 
-3️⃣ Copy and send the SMS here.
+3️⃣ ኤስኤምኤስ (SMS) መልእክቱን ኮፒ አድርገው እዚህ ይላኩ።
 
-You can also send only the FT reference number.
+የFT ቁጥሩን ብቻም መላክ ይችላሉ።
 
-⚡ Send the SMS once after making your payment.
+⚡ ክፍያዎን ከፈጸሙ በኋላ የጽሑፍ መልእክቱን (SMS) አንድ ጊዜ ይላኩ።
 
-Your wallet will be credited automatically after verification.
+ማረጋገጫው ከተከናወነ በኋላ ዋሌትዎ አዉቶማቲክ ይሞላል።.
 
 ━━━━━━━━━━━━━━━
 
-🆘 Need help?
+🆘 እገዛ ይፈልጋሉ?
 
 Contact @fastbochboch`,
           {
@@ -58,7 +58,7 @@ Contact @fastbochboch`,
               inline_keyboard: [
                 [
                   {
-                    text: "⬅️ Back",
+                    text: "⬅️ ተመለስ",
                     callback_data: "deposit_back",
                   },
                 ],
