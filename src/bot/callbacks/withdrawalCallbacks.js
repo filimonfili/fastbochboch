@@ -237,8 +237,9 @@ ${session.balance} ብር
         // PAYMENT NAME
         // ------------------------------------------------------
 
-        const paymentName =
-          session.paymentMethod === "TELEBIRR" ? "Telebirr" : "CBE Birr";
+        const paymentName = ["TELEBIRR", "ቴሌብር"].includes(session.paymentMethod)
+          ? "Telebirr"
+          : "CBE Birr";
 
         // ------------------------------------------------------
         // WITHDRAWAL ID

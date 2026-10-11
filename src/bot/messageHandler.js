@@ -638,11 +638,14 @@ ${amount} ብር
           withdrawalSessions.set(chatId, {
             ...withdrawalSession,
             accountNumber,
-            step: "አረጋግጥ",
+            step: "CONFIRM",
           });
 
-          const paymentName =
-            withdrawalSession.paymentMethod === "TELEBIRR" ? "ቴሌብር" : "CBE ብር";
+          const paymentName = ["TELEBIRR", "ቴሌብር"].includes(
+            withdrawalSession.paymentMethod,
+          )
+            ? "ቴሌብር"
+            : "CBE ብር";
 
           await bot.sendMessage(
             chatId,
@@ -700,7 +703,7 @@ ${accountNumber}
       // CANCEL DEPOSIT
       // ---------------------------------------------------------
 
-      if (text === "/cancel") {
+      if (["/cancel", "cancel"].includes(text.toLowerCase())) {
         depositSessions.delete(chatId);
 
         await bot.sendMessage(chatId, "❌ ገንዘብ ማስገባት ተሰርዟል");
