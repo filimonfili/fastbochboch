@@ -3,30 +3,48 @@ import { sendPaymentMethods } from "../menus/depositMenu.js";
 
 export const registerDepositCallbacks = (bot, depositSessions) => {
   bot.on("callback_query", async (query) => {
-    try {
-      if (!query.message) return;
+    if (!query.message) return;
 
-      const action = query.data;
-      const chatId = query.message.chat.id;
+    const action = query.data;
+    const chatId = query.message.chat.id;
+
+    const depositActions = [
+      "deposit_telebirr",
+      "deposit_cbe_birr",
+      "deposit_back",
+    ];
+
+    if (!depositActions.includes(action)) return;
+
+    try {
+      await bot.answerCallbackQuery(query.id);
 
       // =========================================================
       // TELEBIRR DEPOSIT
       // =========================================================
 
       if (action === "deposit_telebirr") {
+        const settings = await getTelebirrSettings();
+
+        if (!settings?.phone_number || !settings?.account_name) {
+          await bot.sendMessage(
+            chatId,
+            "❌ የቴሌብር ክፍያ መረጃ አልተገኘም። እባክዎ ቆይተው እንደገና ይሞክሩ።",
+          );
+
+          return;
+        }
+
+        // Keep this value consistent with registerMessageHandler.js.
         depositSessions.set(chatId, {
           paymentMethod: "ቴሌብር",
         });
-
-        const settings = await getTelebirrSettings();
-
-        await bot.answerCallbackQuery(query.id);
 
         await bot.sendMessage(
           chatId,
           `📱 ቴሌብር ገንዘብ ማስገባት
 
-ክፍያዎን ወደዚህ ይላኩ:
+ክፍያዎን ወደዚህ ይላኩ፦
 
 📞 ${settings.phone_number}
 
@@ -34,25 +52,23 @@ export const registerDepositCallbacks = (bot, depositSessions) => {
 
 ━━━━━━━━━━━━━━━
 
-📋 ገንዘብ ስያስገቡ የሚከተሉት ደረጃዎች ፡
+📋 የክፍያ ሂደት
 
-1️⃣ ክፍያዎን ከላይ ወዳለው ስልክ ቁጥር ይላኩ።
+1️⃣ ገንዘቡን ከላይ ወዳለው ስልክ ቁጥር ይላኩ።
 
-2️⃣ ክፍያውን ከፈጸሙ በኋላ፣ ቴሌብር (Telebirr) የጽሑፍ መልእክት (SMS) ይልክልዎታል።
+2️⃣ ክፍያውን ከፈጸሙ በኋላ ከቴሌብር የሚመጣውን SMS ይጠብቁ።
 
-3️⃣ ኤስኤምኤስ (SMS) መልእክቱን ኮፒ አድርገው እዚህ ይላኩ።
+3️⃣ የSMS መልእክቱን ኮፒ አድርገው እዚህ ይላኩ።
 
-የFT ቁጥሩን ብቻም መላክ ይችላሉ።
+ወይም የFT ቁጥሩን ብቻ ይላኩ።
 
-⚡ ክፍያዎን ከፈጸሙ በኋላ የጽሑፍ መልእክቱን (SMS) አንድ ጊዜ ይላኩ።
+⚠️ የክፍያ መልእክቱን ወይም FT ቁጥሩን አንድ ጊዜ ብቻ ይላኩ።
 
-ማረጋገጫው ከተከናወነ በኋላ ዋሌትዎ አዉቶማቲክ ይሞላል።.
+✅ ክፍያው ከተረጋገጠ በኋላ ዋሌትዎ በራስ-ሰር ይሞላል።
 
 ━━━━━━━━━━━━━━━
 
-🆘 እገዛ ይፈልጋሉ?
-
-Contact @fastbochboch`,
+🆘 እገዛ ከፈለጉ @fastbochboch ያነጋግሩ።`,
           {
             reply_markup: {
               inline_keyboard: [
@@ -76,25 +92,25 @@ Contact @fastbochboch`,
       }
 
       // =========================================================
-      // CBE BIRR
+      // CBE BIRR — NOT IMPLEMENTED YET
       // =========================================================
 
       if (action === "deposit_cbe_birr") {
         depositSessions.delete(chatId);
 
-        await bot.answerCallbackQuery(query.id);
-
         await bot.sendMessage(
           chatId,
-          `🏦 CBE Birr Deposit
+          `🏦 CBE Birr
 
-CBE Birr deposit instructions will be added next.`,
+የCBE Birr ገንዘብ ማስገቢያ አገልግሎት ገና አልተዘጋጀም።
+
+እባክዎ ለጊዜው ቴሌብርን ይጠቀሙ።`,
           {
             reply_markup: {
               inline_keyboard: [
                 [
                   {
-                    text: "⬅️ Back",
+                    text: "⬅️ ተመለስ",
                     callback_data: "deposit_back",
                   },
                 ],
@@ -107,13 +123,11 @@ CBE Birr deposit instructions will be added next.`,
       }
 
       // =========================================================
-      // BACK
+      // BACK TO PAYMENT METHODS
       // =========================================================
 
       if (action === "deposit_back") {
         depositSessions.delete(chatId);
-
-        await bot.answerCallbackQuery(query.id);
 
         await sendPaymentMethods(bot, chatId);
 
@@ -123,12 +137,9 @@ CBE Birr deposit instructions will be added next.`,
       console.error("❌ Deposit callback error:", error);
 
       try {
-        await bot.answerCallbackQuery(query.id, {
-          text: "❌ Something went wrong",
-          show_alert: true,
-        });
-      } catch (callbackError) {
-        console.error("❌ Failed to answer callback:", callbackError);
+        await bot.sendMessage(chatId, "❌ ችግር ተፈጥሯል። እባክዎ እንደገና ይሞክሩ።");
+      } catch (sendError) {
+        console.error("❌ Failed to send deposit error:", sendError);
       }
     }
   });
