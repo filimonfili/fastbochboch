@@ -37,7 +37,7 @@ export const registerDepositCallbacks = (bot, depositSessions) => {
 
         // Keep this value consistent with registerMessageHandler.js.
         depositSessions.set(chatId, {
-          paymentMethod: "ቴሌብር",
+          paymentMethod: "TELEBIRR",
         });
 
         await bot.sendMessage(
