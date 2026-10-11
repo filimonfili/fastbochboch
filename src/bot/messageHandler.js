@@ -717,7 +717,7 @@ ${accountNumber}
       // ONLY PROCESS TELEBIRR DEPOSIT
       // ---------------------------------------------------------
 
-      if (depositSession.paymentMethod !== "ቴሌብር") {
+      if (depositSession.paymentMethod !== "TELEBIRR") {
         return;
       }
 
@@ -733,7 +733,7 @@ ${accountNumber}
 
       const result = await createPendingDeposit({
         telegramId,
-        paymentMethod: "ቴሌብር",
+        paymentMethod: "TELEBIRR",
         playerMessage: text,
       });
 
