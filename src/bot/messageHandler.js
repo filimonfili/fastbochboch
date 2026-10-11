@@ -695,7 +695,15 @@ ${accountNumber}
 
       const depositSession = depositSessions.get(chatId);
 
+      console.log("🔍 DEPOSIT SESSION CHECK:", {
+        chatId,
+        telegramId,
+        hasSession: Boolean(depositSession),
+        paymentMethod: depositSession?.paymentMethod,
+      });
+
       if (!depositSession) {
+        console.log("⚠️ No deposit session found for:", chatId);
         return;
       }
 
@@ -731,11 +739,29 @@ ${accountNumber}
       // CREATE PENDING DEPOSIT
       // =========================================================
 
-      const result = await createPendingDeposit({
-        telegramId,
-        paymentMethod: "TELEBIRR",
-        playerMessage: text,
-      });
+      let result;
+
+      try {
+        result = await createPendingDeposit({
+          telegramId,
+          paymentMethod: "TELEBIRR",
+          playerMessage: text,
+        });
+      } catch (error) {
+        console.error("❌ CREATE PENDING DEPOSIT FAILED:", {
+          message: error?.message,
+          details: error?.details,
+          code: error?.code,
+          hint: error?.hint,
+        });
+
+        await bot.sendMessage(
+          chatId,
+          "❌ የክፍያ ማረጋገጫ ላይ ችግር ተፈጥሯል። እባክዎ የክፍያ መልእክቱን እንደገና ከመላክዎ በፊት የድጋፍ አገልግሎቱን ያግኙ።",
+        );
+
+        return;
+      }
 
       console.log("💰 ገንዘብ ማስገባት ውጤት:", result);
 
